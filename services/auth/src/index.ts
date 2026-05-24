@@ -1,21 +1,19 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
-const app = express();
+import app from './app';
+import { initSchema } from './db/postgres';
+
 const PORT = process.env.PORT || 4001;
 
-app.use(cors());
-app.use(express.json());
+async function start() {
+  await initSchema();
+  app.listen(PORT, () => {
+    console.log(`[auth] running on port ${PORT}`);
+  });
+}
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'auth', timestamp: new Date().toISOString() });
+start().catch((err) => {
+  console.error('[auth] failed to start:', err);
+  process.exit(1);
 });
-
-app.listen(PORT, () => {
-  console.log(`[auth] running on port ${PORT}`);
-});
-
-export default app;
