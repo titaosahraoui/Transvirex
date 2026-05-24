@@ -1,0 +1,8 @@
+packages:
+  - 'apps/*'
+  - 'services/*'
+  - 'packages/*'
+allowBuilds:
+  '@tensorflow/tfjs-node': set this to true or false
+  core-js: true
+  esbuild: true
