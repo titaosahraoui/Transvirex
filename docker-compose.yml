@@ -1,0 +1,138 @@
+version: '3.9'
+
+# Shared environment variables reused across services
+x-jwt: &jwt
+  JWT_SECRET: changeme_replace_in_production
+  JWT_EXPIRES_IN: 7d
+
+x-pg: &pg
+  DATABASE_URL: postgresql://postgres:postgres@postgres:5432/transvirex
+
+x-mongo: &mongo
+  MONGODB_URI: mongodb://mongodb:27017/transvirex
+
+services:
+  # ── Databases ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: transvirex
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Backend microservices ──────────────────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      <<: *jwt
+      PORT: 4000
+      AUTH_SERVICE_URL: http://auth-svc:4001
+      MISSION_SERVICE_URL: http://mission-svc:4002
+      BILLING_SERVICE_URL: http://billing-svc:4003
+      AI_SERVICE_URL: http://ai-svc:4004
+    depends_on:
+      auth-svc:
+        condition: service_started
+
+  auth-svc:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      <<: [*jwt, *pg]
+      PORT: 4001
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  mission-svc:
+    build:
+      context: .
+      dockerfile: services/mission/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4002:4002"
+    environment:
+      <<: [*pg, *mongo]
+      PORT: 4002
+      NOTIFICATION_SERVICE_URL: http://notification-svc:4005
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+
+  billing-svc:
+    build:
+      context: .
+      dockerfile: services/billing-svc/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4003:4003"
+    environment:
+      <<: *pg
+      PORT: 4003
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  ai-svc:
+    build:
+      context: .
+      dockerfile: services/ai/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4004:4004"
+    environment:
+      PORT: 4004
+      AUTH_SERVICE_URL: http://auth-svc:4001
+      MISSION_SERVICE_URL: http://mission-svc:4002
+
+  notification-svc:
+    build:
+      context: .
+      dockerfile: services/notification/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "4005:4005"
+    environment:
+      <<: [*jwt, *mongo]
+      PORT: 4005
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  mongo_data:
