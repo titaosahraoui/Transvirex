@@ -4,11 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../hooks/useSocket';
 
 interface ChatMessage {
-  id?: string;
-  senderId: string;
-  content: string;
-  timestamp: string | Date;
-  pending?: boolean;
+  id?: string; senderId: string; content: string;
+  timestamp: string | Date; pending?: boolean;
 }
 
 export default function ChatPage() {
@@ -19,17 +16,14 @@ export default function ChatPage() {
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Dispatcher to send to (hardcoded for demo — in production would be a conversation list)
   const DISPATCHER_ID = import.meta.env.VITE_DISPATCHER_ID ?? '';
 
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
-
     socket.on('message:received', (msg: ChatMessage) => {
       setMessages(prev => [...prev, { ...msg, timestamp: new Date(msg.timestamp) }]);
     });
-
     return () => { socket.off('message:received'); };
   }, [socketRef.current]);
 
@@ -40,42 +34,59 @@ export default function ChatPage() {
   function send() {
     const socket = socketRef.current;
     if (!socket || !input.trim() || !DISPATCHER_ID) return;
-
-    const msg: ChatMessage = {
-      senderId:  user!.id,
-      content:   input.trim(),
-      timestamp: new Date(),
-      pending:   true,
-    };
+    const msg: ChatMessage = { senderId: user!.id, content: input.trim(), timestamp: new Date(), pending: true };
     setMessages(prev => [...prev, msg]);
     socket.emit('message:send', { to: DISPATCHER_ID, content: input.trim() });
     setInput('');
   }
 
+  const connected = socketRef.current?.connected;
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <header className="bg-gray-800 px-4 py-4 flex items-center gap-3 sticky top-0">
-        <button onClick={() => navigate('/missions')} className="text-gray-400 text-xl">←</button>
-        <h1 className="font-bold">Dispatcher Chat</h1>
-        <span className={`ml-auto w-2 h-2 rounded-full ${socketRef.current?.connected ? 'bg-green-400' : 'bg-gray-500'}`} />
-      </header>
+    <div className="wf-phone" style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <div className="wf-phone-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            className="mono muted"
+            style={{ fontSize: 12, cursor: 'pointer' }}
+            onClick={() => navigate('/missions')}
+          >
+            ←
+          </span>
+          <span style={{ fontWeight: 700 }}>Messagerie Dispatcher</span>
+        </div>
+        <span
+          style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: connected ? 'var(--good)' : 'var(--ink-3)',
+            display: 'inline-block',
+          }}
+        />
+      </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 pb-20">
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 80 }}>
         {messages.length === 0 && (
-          <p className="text-center text-gray-500 mt-12">No messages yet</p>
+          <div className="mono muted" style={{ textAlign: 'center', marginTop: 40, fontSize: 12 }}>
+            Aucun message pour l'instant
+          </div>
         )}
         {messages.map((msg, i) => {
           const isMe = msg.senderId === user?.id;
           return (
-            <div key={i} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-xs px-4 py-2 rounded-2xl text-sm
-                ${isMe ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100'}
-                ${msg.pending ? 'opacity-60' : ''}`}>
-                <p>{msg.content}</p>
-                <p className="text-xs opacity-60 mt-1">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
+            <div key={i} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+              <div
+                className={isMe ? 'msg-me' : 'msg-them'}
+                style={{
+                  maxWidth: '78%', padding: '8px 12px', fontSize: 13,
+                  opacity: msg.pending ? 0.65 : 1,
+                }}
+              >
+                <div>{msg.content}</div>
+                <div className="mono" style={{ fontSize: 9, opacity: 0.6, marginTop: 3 }}>
+                  {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
             </div>
           );
@@ -83,23 +94,36 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 px-4 py-3 flex gap-2">
+      {/* Input bar */}
+      <div style={{
+        position: 'fixed', bottom: 68, left: 0, right: 0, maxWidth: 430, margin: '0 auto',
+        background: 'var(--paper-2)', borderTop: '1.4px dashed var(--ink)',
+        padding: '10px 12px', display: 'flex', gap: 8,
+      }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && send()}
-          placeholder="Type a message…"
-          className="flex-1 bg-gray-700 text-white rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Écrire un message…"
+          className="wf-inp"
+          style={{ flex: 1 }}
         />
-        <button
-          onClick={send}
-          disabled={!input.trim()}
-          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-xl transition-colors"
-        >
-          Send
+        <button onClick={send} disabled={!input.trim()} className="wf-btn fill sm">
+          Envoyer
         </button>
       </div>
+
+      {/* Tab bar */}
+      <nav className="wf-tabbar">
+        <button className="wf-tabbar-btn" onClick={() => navigate('/missions')}>
+          <span style={{ fontSize: 18 }}>📋</span>
+          <span>Missions</span>
+        </button>
+        <button className="wf-tabbar-btn active" onClick={() => navigate('/chat')}>
+          <span style={{ fontSize: 18 }}>💬</span>
+          <span>Messagerie</span>
+        </button>
+      </nav>
     </div>
   );
 }

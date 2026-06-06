@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
@@ -12,63 +12,52 @@ export default function LoginPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError(''); setLoading(true);
     try {
       await login(email, password);
       navigate('/missions');
     } catch {
-      setError('Invalid email or password');
-    } finally {
-      setLoading(false);
-    }
+      setError('Email ou mot de passe incorrect');
+    } finally { setLoading(false); }
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="text-3xl font-bold text-white text-center mb-2">Transvirex</h1>
-        <p className="text-gray-400 text-center mb-8">Driver Portal</p>
+    <div className="wf-login">
+      <div className="wf-login-card">
+        <div className="wf-login-brand">transvirex<span style={{ color: 'var(--accent)' }}>.</span></div>
+        <div className="wf-login-sub">Espace Chauffeur</div>
 
-        <form onSubmit={handleSubmit} className="bg-gray-800 rounded-2xl p-6 space-y-4">
-          {error && (
-            <div className="bg-red-500/20 text-red-400 text-sm rounded-lg px-4 py-2">
-              {error}
-            </div>
-          )}
+        {error && <div className="wf-error">{error}</div>}
 
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Email</label>
+            <label className="wf-field-label">Email</label>
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-              className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="driver@transvirex.com"
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              className="wf-inp box" placeholder="karim@transvirex.fr"
+              style={{ width: '100%' }}
             />
           </div>
-
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Password</label>
+            <label className="wf-field-label">Mot de passe</label>
             <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-              className="w-full bg-gray-700 text-white rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••"
+              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              className="wf-inp box" placeholder="••••••••"
+              style={{ width: '100%' }}
             />
           </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-3 transition-colors"
-          >
-            {loading ? 'Signing in…' : 'Sign In'}
+          <button type="submit" disabled={loading} className="wf-btn fill block" style={{ marginTop: 4 }}>
+            {loading ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
+
+        <hr className="wf-wave" />
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
+          Pas de compte ?{' '}
+          <Link to="/register" style={{ color: 'var(--ink)', fontWeight: 700, textDecoration: 'underline dotted' }}>
+            S'inscrire
+          </Link>
+        </p>
       </div>
     </div>
   );

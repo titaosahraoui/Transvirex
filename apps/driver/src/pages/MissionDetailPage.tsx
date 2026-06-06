@@ -3,35 +3,35 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../context/AuthContext';
 
 interface Mission {
-  id: string;
-  clientName: string;
-  pickupAddress: string;
-  pickupLat: number;
-  pickupLng: number;
-  deliveryAddress: string;
-  deliveryLat: number;
-  deliveryLng: number;
-  deadline: string | null;
-  status: string;
-  driverId: string | null;
+  id: string; clientName: string; pickupAddress: string;
+  pickupLat: number; pickupLng: number; deliveryAddress: string;
+  deliveryLat: number; deliveryLng: number;
+  deadline: string | null; status: string; driverId: string | null;
 }
 
-const NEXT_ACTIONS: Record<string, { label: string; status: string; color: string }[]> = {
+const STATUS_LABEL: Record<string, string> = {
+  assigned: 'Assignée', in_progress: 'En route', completed: 'Livrée', failed: 'Échec',
+};
+const STATUS_PILL: Record<string, string> = {
+  assigned: 'warn', in_progress: 'warn', completed: 'good', failed: 'bad',
+};
+
+const NEXT_ACTIONS: Record<string, { label: string; status: string; variant: string }[]> = {
   assigned: [
-    { label: '✅ Accept Mission',  status: 'in_progress', color: 'bg-green-600 hover:bg-green-700' },
-    { label: '❌ Refuse Mission',  status: 'pending',     color: 'bg-red-600   hover:bg-red-700'   },
+    { label: '✅ Accepter la mission', status: 'in_progress', variant: 'good' },
+    { label: '✕ Refuser',             status: 'pending',     variant: 'bad'  },
   ],
   in_progress: [
-    { label: '✅ Mark Delivered',  status: 'completed', color: 'bg-green-600 hover:bg-green-700' },
-    { label: '⚠️ Report Incident', status: 'failed',    color: 'bg-red-600   hover:bg-red-700'   },
+    { label: '✅ Marquer comme livrée',   status: 'completed', variant: 'good' },
+    { label: '⚠ Signaler un incident',    status: 'failed',    variant: 'warn' },
   ],
 };
 
 export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [mission, setMission] = useState<Mission | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [mission, setMission]   = useState<Mission | null>(null);
+  const [loading, setLoading]   = useState(true);
   const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
@@ -47,112 +47,124 @@ export default function MissionDetailPage() {
     try {
       await api.patch(`/missions/${mission.id}/status`, { status });
       if (status === 'pending') {
-        // refused — go back to list
         navigate('/missions');
       } else {
         setMission(prev => prev ? { ...prev, status } : prev);
       }
     } catch (err) {
       console.error(err);
-      alert('Failed to update mission status');
-    } finally {
-      setUpdating(false);
-    }
+    } finally { setUpdating(false); }
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-      Loading…
+    <div className="wf-phone" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span className="mono muted">Chargement…</span>
     </div>
   );
 
   if (!mission) return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">
-      Mission not found
+    <div className="wf-phone" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span className="mono muted">Mission introuvable</span>
     </div>
   );
 
   const actions = NEXT_ACTIONS[mission.status] ?? [];
+  const statusLabel = STATUS_LABEL[mission.status] ?? mission.status;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="wf-phone">
       {/* Header */}
-      <header className="bg-gray-800 px-4 py-4 flex items-center gap-3 sticky top-0">
-        <button onClick={() => navigate('/missions')} className="text-gray-400 hover:text-white text-xl">
-          ←
-        </button>
-        <h1 className="font-bold text-lg">{mission.clientName}</h1>
-      </header>
+      <div className="wf-phone-header">
+        <span
+          className="mono muted"
+          style={{ fontSize: 12, cursor: 'pointer' }}
+          onClick={() => navigate('/missions')}
+        >
+          ← Retour
+        </span>
+        <span className={`wf-pill ${STATUS_PILL[mission.status] ?? ''}`}>{statusLabel}</span>
+      </div>
 
-      <div className="px-4 py-6 space-y-4">
-        {/* Status badge */}
-        <div className="flex">
-          <span className="bg-blue-600/20 text-blue-300 px-3 py-1 rounded-full text-sm">
-            {mission.status.replace('_', ' ')}
-          </span>
+      <div style={{ padding: '16px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* Client + ID */}
+        <div>
+          <div className="script" style={{ fontSize: 26, lineHeight: 1 }}>{mission.clientName}</div>
+          <div className="mono muted" style={{ fontSize: 10, marginTop: 2 }}>
+            Mission {mission.id.slice(0, 8)} · {statusLabel}
+          </div>
         </div>
 
-        {/* Route card */}
-        <div className="bg-gray-800 rounded-2xl p-4 space-y-3">
+        {/* Route */}
+        <div className="wf-box solid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div>
-            <p className="text-xs text-gray-400 mb-1">PICKUP</p>
-            <p className="font-medium">📍 {mission.pickupAddress}</p>
-            {mission.pickupLat && (
-              <p className="text-xs text-gray-500">
-                {parseFloat(String(mission.pickupLat)).toFixed(4)}, {parseFloat(String(mission.pickupLng)).toFixed(4)}
-              </p>
-            )}
+            <div className="mono" style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Enlèvement</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>📍 {mission.pickupAddress}</div>
           </div>
-          <div className="border-t border-gray-700" />
+          <div style={{ borderTop: '1.2px dashed var(--ink-3)', margin: '0 -14px' }} />
           <div>
-            <p className="text-xs text-gray-400 mb-1">DELIVERY</p>
-            <p className="font-medium">🏁 {mission.deliveryAddress}</p>
+            <div className="mono" style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Livraison</div>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>🏁 {mission.deliveryAddress}</div>
           </div>
           {mission.deadline && (
             <>
-              <div className="border-t border-gray-700" />
-              <div>
-                <p className="text-xs text-gray-400 mb-1">DEADLINE</p>
-                <p className="text-orange-400">⏰ {new Date(mission.deadline).toLocaleString()}</p>
+              <div style={{ borderTop: '1.2px dashed var(--ink-3)', margin: '0 -14px' }} />
+              <div className="mono" style={{ fontSize: 11, color: 'var(--accent)' }}>
+                ⏱ Délai : {new Date(mission.deadline).toLocaleString('fr-FR')}
               </div>
             </>
           )}
         </div>
 
-        {/* Open in maps */}
-        {mission.pickupLat && (
+        {/* Maps link */}
+        {mission.deliveryLat && (
           <a
             href={`https://www.google.com/maps/dir/?api=1&destination=${mission.deliveryLat},${mission.deliveryLng}`}
             target="_blank"
             rel="noreferrer"
-            className="block w-full bg-gray-700 hover:bg-gray-600 text-center py-3 rounded-xl text-sm transition-colors"
+            className="wf-btn"
+            style={{ textAlign: 'center', textDecoration: 'none', display: 'block' }}
           >
-            🗺️ Open Route in Maps
+            🗺 Ouvrir l'itinéraire
           </a>
         )}
 
         {/* Action buttons */}
-        {actions.length > 0 && (
-          <div className="space-y-3 pt-4">
-            {actions.map(action => (
-              <button
-                key={action.status}
-                disabled={updating}
-                onClick={() => updateStatus(action.status)}
-                className={`w-full py-4 rounded-xl font-semibold text-white transition-colors disabled:opacity-50 ${action.color}`}
-              >
-                {updating ? 'Updating…' : action.label}
-              </button>
-            ))}
+        {actions.map(action => (
+          <button
+            key={action.status}
+            disabled={updating}
+            onClick={() => updateStatus(action.status)}
+            className={`wf-btn ${action.variant}`}
+            style={{ width: '100%', padding: '12px 0', fontSize: 14 }}
+          >
+            {updating ? 'Mise à jour…' : action.label}
+          </button>
+        ))}
+
+        {mission.status === 'completed' && (
+          <div className="wf-box" style={{ background: '#e3f4dc', borderStyle: 'solid', borderColor: 'var(--good)', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'var(--font-script)', fontSize: 22, fontWeight: 700 }}>✓ Mission livrée</div>
           </div>
         )}
 
-        {(mission.status === 'completed' || mission.status === 'failed') && (
-          <div className="bg-gray-800 rounded-2xl p-4 text-center text-gray-400">
-            Mission {mission.status}
+        {mission.status === 'failed' && (
+          <div className="wf-box" style={{ background: '#ffd9d9', borderStyle: 'solid', borderColor: 'var(--bad)', textAlign: 'center' }}>
+            <div style={{ fontFamily: 'var(--font-script)', fontSize: 22, fontWeight: 700 }}>⚠ Mission échouée</div>
           </div>
         )}
       </div>
+
+      {/* Tab bar */}
+      <nav className="wf-tabbar">
+        <button className="wf-tabbar-btn active" onClick={() => navigate('/missions')}>
+          <span style={{ fontSize: 18 }}>📋</span>
+          <span>Missions</span>
+        </button>
+        <button className="wf-tabbar-btn" onClick={() => navigate('/chat')}>
+          <span style={{ fontSize: 18 }}>💬</span>
+          <span>Messagerie</span>
+        </button>
+      </nav>
     </div>
   );
 }

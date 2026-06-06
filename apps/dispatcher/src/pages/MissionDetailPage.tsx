@@ -6,13 +6,19 @@ interface Mission {
   id: string; clientName: string; pickupAddress: string; deliveryAddress: string;
   deadline: string | null; status: string; driverId: string | null;
 }
-
 interface Suggestion {
   driverId: string; name: string; score: number;
-  features: { distanceKm: number; currentLoad: number; acceptanceRate: number; };
+  features: { distanceKm: number; currentLoad: number; acceptanceRate: number };
 }
-
 interface Driver { id: string; name: string; status: string; }
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'En attente', assigned: 'Assignée', in_progress: 'En route',
+  completed: 'Livrée', failed: 'Échec',
+};
+const STATUS_PILL: Record<string, string> = {
+  pending: '', assigned: 'warn', in_progress: 'warn', completed: 'good', failed: 'bad',
+};
 
 export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -34,7 +40,7 @@ export default function MissionDetailPage() {
     try {
       const r = await api.post('/ai/suggest-assignment', { missionId: id });
       setSuggestions(r.data.data.suggestions);
-    } catch { setError('AI service unavailable'); }
+    } catch { setError('Service IA indisponible'); }
     finally { setAiLoading(false); }
   }
 
@@ -44,100 +50,193 @@ export default function MissionDetailPage() {
       await api.patch(`/missions/${id}/assign`, { driverId });
       setMission(prev => prev ? { ...prev, status: 'assigned', driverId } : prev);
       setSuggestions([]);
-    } catch { setError('Failed to assign driver'); }
+    } catch { setError('Impossible d\'assigner le chauffeur'); }
     finally { setAssigning(false); }
   }
 
-  if (!mission) return <div className="min-h-screen bg-gray-100 flex items-center justify-center text-gray-400">Loading…</div>;
+  if (!mission) return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <span className="mono muted">Chargement…</span>
+    </div>
+  );
+
+  const statusLabel = STATUS_LABEL[mission.status] ?? mission.status;
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/board')} className="text-gray-400 hover:text-gray-700">← Board</button>
-        <h1 className="font-bold text-xl text-gray-800">{mission.clientName}</h1>
-        <span className={`ml-auto text-sm px-3 py-1 rounded-full font-medium
-          ${mission.status === 'pending' ? 'bg-gray-100 text-gray-600' :
-            mission.status === 'assigned' ? 'bg-yellow-100 text-yellow-700' :
-            mission.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-            mission.status === 'completed' ? 'bg-green-100 text-green-700' :
-            'bg-red-100 text-red-700'}`}>
-          {mission.status.replace('_', ' ')}
-        </span>
-      </header>
+    <div className="wf-shell">
+      {/* Sidebar */}
+      <aside className="wf-side">
+        <div className="side-logo">transvirex</div>
+        <div className="side-group">OPÉRATIONS</div>
+        <div className="side-nav on" onClick={() => navigate('/board')}>
+          <span className="ic">📋</span> Missions
+        </div>
+        <div className="side-nav" onClick={() => navigate('/missions/new')}>
+          <span className="ic">＋</span> Nouvelle mission
+        </div>
+      </aside>
 
-      <div className="max-w-3xl mx-auto p-6 space-y-4">
-        {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-2">{error}</div>}
-
-        {/* Mission info */}
-        <div className="bg-white rounded-2xl p-5 shadow-sm space-y-3">
-          <div><p className="text-xs text-gray-400 mb-1">PICKUP</p><p className="font-medium">📍 {mission.pickupAddress}</p></div>
-          <div className="border-t" />
-          <div><p className="text-xs text-gray-400 mb-1">DELIVERY</p><p className="font-medium">🏁 {mission.deliveryAddress}</p></div>
-          {mission.deadline && (
-            <><div className="border-t" />
-            <p className="text-orange-500 text-sm">⏰ {new Date(mission.deadline).toLocaleString()}</p></>
-          )}
+      <div className="wf-shell-main">
+        <div className="wf-appbar">
+          <span
+            className="mono muted"
+            style={{ cursor: 'pointer', fontSize: 11 }}
+            onClick={() => navigate('/board')}
+          >
+            ← Missions
+          </span>
+          <span className="bar-crumbs">/ {mission.clientName}</span>
+          <div className="bar-actions">
+            <span className={`wf-pill ${STATUS_PILL[mission.status]}`}>{statusLabel}</span>
+            {mission.status === 'in_progress' && (
+              <button className="wf-btn warn sm" onClick={() => api.patch(`/missions/${id}/status`, { status: 'failed' }).then(() => setMission(p => p ? { ...p, status: 'failed' } : p))}>
+                ⚠ Incident
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Assignment panel — only for pending missions */}
-        {mission.status === 'pending' && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-800">🤖 AI Driver Suggestions</h2>
-              <button onClick={fetchAISuggestions} disabled={aiLoading}
-                className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-sm px-4 py-1.5 rounded-lg transition-colors">
-                {aiLoading ? 'Analyzing…' : 'Get Suggestions'}
-              </button>
-            </div>
+        <div className="wf-shell-content" style={{ maxWidth: 900 }}>
+          {error && <div className="wf-error" style={{ marginBottom: 14 }}>{error}</div>}
 
-            {suggestions.length > 0 && (
-              <div className="space-y-2 mb-4">
-                {suggestions.map((s, i) => (
-                  <div key={s.driverId} className="flex items-center justify-between bg-purple-50 rounded-xl p-3">
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        {i === 0 && <span className="text-yellow-500 mr-1">★</span>}
-                        {s.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {s.features.distanceKm.toFixed(1)} km · load {s.features.currentLoad} · {s.features.acceptanceRate.toFixed(0)}% acceptance
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-bold text-purple-700">{(s.score * 100).toFixed(0)}%</span>
-                      <button onClick={() => assignDriver(s.driverId)} disabled={assigning}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
-                        Assign
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <h3 className="text-sm font-medium text-gray-600 mb-2">All available drivers</h3>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {drivers.map(d => (
-                <div key={d.id} className="flex items-center justify-between py-2 px-3 hover:bg-gray-50 rounded-lg">
-                  <span className="text-sm text-gray-700">{d.name}</span>
-                  <button onClick={() => assignDriver(d.id)} disabled={assigning}
-                    className="text-xs bg-gray-100 hover:bg-blue-600 hover:text-white text-gray-600 px-3 py-1 rounded-lg transition-colors">
-                    Assign
-                  </button>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 14 }}>
+            {/* Left: info + timeline */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div className="script" style={{ fontSize: 28, lineHeight: 1 }}>{mission.clientName}</div>
+                <div className="mono muted" style={{ fontSize: 10.5, marginTop: 2 }}>
+                  Mission {mission.id.slice(0, 8)} · {statusLabel}
                 </div>
-              ))}
-              {drivers.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No available drivers</p>}
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="wf-box solid">
+                  <div className="mono" style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Enlèvement</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>📍 {mission.pickupAddress}</div>
+                </div>
+                <div className="wf-box solid">
+                  <div className="mono" style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>Livraison</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>🏁 {mission.deliveryAddress}</div>
+                </div>
+              </div>
+
+              {mission.deadline && (
+                <div className="wf-box tint">
+                  <span className="mono" style={{ fontSize: 11 }}>
+                    ⏱ Délai : {new Date(mission.deadline).toLocaleString('fr-FR')}
+                  </span>
+                </div>
+              )}
+
+              {/* Timeline */}
+              <div>
+                <div className="mono muted" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+                  Chronologie
+                </div>
+                <div style={{ borderLeft: '2px dashed var(--ink)', paddingLeft: 12, marginLeft: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {[
+                    { label: 'Créée', done: true },
+                    { label: 'Assignée à un chauffeur', done: ['assigned','in_progress','completed'].includes(mission.status) },
+                    { label: 'Prise en charge', done: ['in_progress','completed'].includes(mission.status) },
+                    { label: 'En route', done: ['in_progress','completed'].includes(mission.status) },
+                    { label: 'Livrée / POD validé', done: mission.status === 'completed' },
+                  ].map((step, i) => (
+                    <div key={i} className="wf-row" style={{ padding: '6px 10px', gap: 8 }}>
+                      <div className="wf-row-lead" style={{ width: 28, height: 28, fontSize: 13 }}>
+                        {step.done ? '✓' : '○'}
+                      </div>
+                      <span style={{ fontSize: 13, color: step.done ? 'var(--ink)' : 'var(--ink-3)' }}>{step.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: assignment */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {mission.status === 'pending' && (
+                <div className="wf-box solid">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                    <span style={{ fontWeight: 700, fontSize: 13 }}>🤖 Suggestions IA</span>
+                    <button className="wf-btn sm" disabled={aiLoading} onClick={fetchAISuggestions}>
+                      {aiLoading ? 'Analyse…' : 'Analyser'}
+                    </button>
+                  </div>
+
+                  {suggestions.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      {suggestions.map((s, i) => (
+                        <div key={s.driverId} className="wf-row solid" style={{ marginTop: i ? 6 : 0, gap: 8 }}>
+                          <div className="wf-row-lead" style={{ background: i === 0 ? 'var(--hi)' : '#fff5d6' }}>
+                            {i === 0 ? '★' : s.name[0]}
+                          </div>
+                          <div className="wf-row-main">
+                            <b>{s.name}</b>
+                            <small>{s.features.distanceKm.toFixed(1)} km · charge {s.features.currentLoad}</small>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                            <span className="mono" style={{ fontSize: 11, fontWeight: 700 }}>
+                              {(s.score * 100).toFixed(0)}%
+                            </span>
+                            <button className="wf-btn sm good" disabled={assigning} onClick={() => assignDriver(s.driverId)}>
+                              Assigner
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mono muted" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+                    Tous les chauffeurs disponibles
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflowY: 'auto' }}>
+                    {drivers.map(d => (
+                      <div key={d.id} className="wf-row clickable" style={{ gap: 8 }}>
+                        <div className="wf-row-lead">{d.name[0]}</div>
+                        <div className="wf-row-main"><b>{d.name}</b></div>
+                        <button className="wf-btn sm" disabled={assigning} onClick={() => assignDriver(d.id)}>
+                          Assigner
+                        </button>
+                      </div>
+                    ))}
+                    {drivers.length === 0 && (
+                      <div className="mono muted" style={{ textAlign: 'center', fontSize: 11, padding: '12px 0' }}>
+                        Aucun chauffeur disponible
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {mission.driverId && mission.status !== 'pending' && (
+                <div className="wf-box solid">
+                  <div className="mono" style={{ fontSize: 10, textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 6 }}>Chauffeur assigné</div>
+                  <div className="wf-row solid">
+                    <div className="wf-row-lead">🚐</div>
+                    <div className="wf-row-main">
+                      <b>Chauffeur #{mission.driverId.slice(0, 6)}</b>
+                      <small>{statusLabel}</small>
+                    </div>
+                    <span className={`wf-pill ${STATUS_PILL[mission.status]}`}>{statusLabel}</span>
+                  </div>
+                </div>
+              )}
+
+              {mission.status === 'completed' && (
+                <div className="wf-box" style={{ background: '#e3f4dc', borderStyle: 'solid', borderColor: 'var(--good)' }}>
+                  <div style={{ fontFamily: 'var(--font-script)', fontSize: 22, fontWeight: 700 }}>✓ Mission livrée</div>
+                </div>
+              )}
+
+              {mission.status === 'failed' && (
+                <div className="wf-box" style={{ background: '#ffd9d9', borderStyle: 'solid', borderColor: 'var(--bad)' }}>
+                  <div style={{ fontFamily: 'var(--font-script)', fontSize: 22, fontWeight: 700 }}>⚠ Mission échouée</div>
+                </div>
+              )}
             </div>
           </div>
-        )}
-
-        {/* Driver assigned info */}
-        {mission.driverId && mission.status !== 'pending' && (
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-semibold text-gray-800 mb-2">Assigned Driver</h2>
-            <p className="text-gray-600 text-sm">Driver ID: {mission.driverId}</p>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
