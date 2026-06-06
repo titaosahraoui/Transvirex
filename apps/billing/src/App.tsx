@@ -1,21 +1,21 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-
-function LoginPage() {
-  return <div className="flex items-center justify-center min-h-screen"><h1 className="text-2xl font-bold">Billing Login</h1></div>;
-}
-
-function InvoicesPage() {
-  return <div className="p-4"><h1 className="text-xl font-bold">Invoices</h1></div>;
-}
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import InvoicesPage from './pages/InvoicesPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/invoices" element={<InvoicesPage />} />
-        <Route path="/" element={<Navigate to="/invoices" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/invoices" element={<ProtectedRoute><InvoicesPage /></ProtectedRoute>} />
+          <Route path="/" element={<Navigate to="/invoices" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

@@ -1,21 +1,22 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
-const app = express();
+import app from './app';
+import { getModel } from './ml/model';
+
 const PORT = process.env.PORT || 4004;
 
-app.use(cors());
-app.use(express.json());
+async function start(): Promise<void> {
+  // Pre-train the model at startup so the first request isn't slow
+  console.log('[ai] Training model on synthetic data...');
+  await getModel();
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'ai', timestamp: new Date().toISOString() });
+  app.listen(PORT, () => {
+    console.log(`[ai] running on port ${PORT}`);
+  });
+}
+
+start().catch((err) => {
+  console.error('[ai] failed to start:', err);
+  process.exit(1);
 });
-
-app.listen(PORT, () => {
-  console.log(`[ai] running on port ${PORT}`);
-});
-
-export default app;

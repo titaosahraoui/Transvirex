@@ -1,22 +1,33 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-
-// Pages will be imported here as they are built
-function LoginPage() {
-  return <div className="flex items-center justify-center min-h-screen"><h1 className="text-2xl font-bold">Driver Login</h1></div>;
-}
-
-function MissionsPage() {
-  return <div className="p-4"><h1 className="text-xl font-bold">My Missions</h1></div>;
-}
+import { AuthProvider } from './context/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import MissionsPage from './pages/MissionsPage';
+import MissionDetailPage from './pages/MissionDetailPage';
+import ChatPage from './pages/ChatPage';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/missions" element={<MissionsPage />} />
-        <Route path="/" element={<Navigate to="/missions" replace />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          <Route path="/missions" element={
+            <ProtectedRoute><MissionsPage /></ProtectedRoute>
+          } />
+          <Route path="/missions/:id" element={
+            <ProtectedRoute><MissionDetailPage /></ProtectedRoute>
+          } />
+          <Route path="/chat" element={
+            <ProtectedRoute><ChatPage /></ProtectedRoute>
+          } />
+
+          <Route path="/" element={<Navigate to="/missions" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

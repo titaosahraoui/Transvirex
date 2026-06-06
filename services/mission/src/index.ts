@@ -1,21 +1,21 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
-
 dotenv.config();
 
-const app = express();
+import app from './app';
+import { initSchema } from './db/postgres';
+import { connectMongo } from './db/mongo';
+
 const PORT = process.env.PORT || 4002;
 
-app.use(cors());
-app.use(express.json());
+async function start(): Promise<void> {
+  await initSchema();
+  await connectMongo();
+  app.listen(PORT, () => {
+    console.log(`[mission] running on port ${PORT}`);
+  });
+}
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'mission', timestamp: new Date().toISOString() });
+start().catch((err) => {
+  console.error('[mission] failed to start:', err);
+  process.exit(1);
 });
-
-app.listen(PORT, () => {
-  console.log(`[mission] running on port ${PORT}`);
-});
-
-export default app;
