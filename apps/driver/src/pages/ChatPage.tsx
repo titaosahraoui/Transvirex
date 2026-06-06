@@ -31,13 +31,36 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  function send() {
+  function handleSend(text: string) {
     const socket = socketRef.current;
-    if (!socket || !input.trim() || !DISPATCHER_ID) return;
-    const msg: ChatMessage = { senderId: user!.id, content: input.trim(), timestamp: new Date(), pending: true };
+    if (!socket || !text.trim() || !DISPATCHER_ID) return;
+    const msg: ChatMessage = { senderId: user!.id, content: text.trim(), timestamp: new Date(), pending: true };
     setMessages(prev => [...prev, msg]);
-    socket.emit('message:send', { to: DISPATCHER_ID, content: input.trim() });
+    socket.emit('message:send', { to: DISPATCHER_ID, content: text.trim() });
+  }
+
+  function send() {
+    handleSend(input.trim());
     setInput('');
+  }
+
+  function shareLocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        handleSend(`📍 Ma position : https://maps.google.com/?q=${lat.toFixed(6)},${lng.toFixed(6)}`);
+      },
+      err => console.error('[GPS chat]', err),
+    );
+  }
+
+  function renderContent(text: string) {
+    return text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
+      /^https?:\/\//.test(part)
+        ? <a key={i} href={part} target="_blank" rel="noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>{part}</a>
+        : part
+    );
   }
 
   const connected = socketRef.current?.connected;
@@ -83,7 +106,7 @@ export default function ChatPage() {
                   opacity: msg.pending ? 0.65 : 1,
                 }}
               >
-                <div>{msg.content}</div>
+                <div>{renderContent(msg.content)}</div>
                 <div className="mono" style={{ fontSize: 9, opacity: 0.6, marginTop: 3 }}>
                   {new Date(msg.timestamp).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                 </div>
@@ -108,6 +131,9 @@ export default function ChatPage() {
           className="wf-inp"
           style={{ flex: 1 }}
         />
+        <button onClick={shareLocation} className="wf-btn sm" title="Partager ma position">
+          📍
+        </button>
         <button onClick={send} disabled={!input.trim()} className="wf-btn fill sm">
           Envoyer
         </button>

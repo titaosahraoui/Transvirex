@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -25,15 +26,16 @@ const PIE_COLORS = ['var(--ink-3)', 'var(--hi)', 'var(--accent)', 'var(--good)',
 
 const mgmtNav = [
   'PERFORMANCE',
-  { key: 'dash',  icon: '📊', label: 'Tableau de bord' },
+  { key: 'dash',  icon: '📊', label: 'Tableau de bord', path: '/dashboard' },
   { key: 'sla',   icon: '⏱',  label: 'SLA & délais' },
   'FLOTTE',
-  { key: 'drv',   icon: '🚐', label: 'Chauffeurs' },
+  { key: 'drv',   icon: '🚐', label: 'Chauffeurs', path: '/drivers' },
   { key: 'geo',   icon: '🗺',  label: 'Géographie' },
 ];
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats]     = useState<BillingStats | null>(null);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
@@ -41,7 +43,7 @@ export default function DashboardPage() {
   useEffect(() => {
     api.get('/billing/stats').then(r => setStats(r.data.data)).catch(console.error);
     api.get('/drivers').then(r => setDrivers(r.data.data)).catch(console.error);
-    api.get('/missions').then(r => setMissions(r.data.data)).catch(console.error);
+    api.get('/missions?limit=500').then(r => setMissions(r.data.data.items)).catch(console.error);
   }, []);
 
   const statusCounts = ['pending','assigned','in_progress','completed','failed'].map((s, i) => ({
@@ -72,7 +74,11 @@ export default function DashboardPage() {
         {mgmtNav.map((item, i) => {
           if (typeof item === 'string') return <div key={i} className="side-group">{item}</div>;
           return (
-            <div key={item.key} className={`side-nav ${item.key === 'dash' ? 'on' : ''}`}>
+            <div
+              key={item.key}
+              className={`side-nav ${item.key === 'dash' ? 'on' : ''}`}
+              onClick={() => 'path' in item && item.path && navigate(item.path)}
+            >
               <span className="ic">{item.icon}</span> {item.label}
             </div>
           );

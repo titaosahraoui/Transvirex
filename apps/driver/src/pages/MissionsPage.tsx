@@ -10,10 +10,10 @@ interface Mission {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  assigned: 'Assignée', in_progress: 'En route', completed: 'Livrée', failed: 'Échec',
+  assigned: 'Assignée', in_progress: 'En route', completed: 'Livrée', failed: 'Échec', cancelled: 'Annulée',
 };
 const STATUS_PILL: Record<string, string> = {
-  assigned: 'warn', in_progress: 'warn', completed: 'good', failed: 'bad',
+  assigned: 'warn', in_progress: 'warn', completed: 'good', failed: 'bad', cancelled: 'bad',
 };
 
 export default function MissionsPage() {
@@ -34,7 +34,7 @@ export default function MissionsPage() {
         ? `/missions?driverId=${driverId}`
         : `/missions?driverId=${driverId}&status=${filter}`;
       const r = await api.get(url);
-      setMissions(r.data.data);
+      setMissions(r.data.data.items);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, [user, filter]);
@@ -45,13 +45,24 @@ export default function MissionsPage() {
   useEffect(() => {
     const socket = socketRef.current;
     if (!socket) return;
-    const handler = (data: { clientName?: string }) => {
+    const assignHandler = (data: { clientName?: string }) => {
       load();
       setNotification(`Nouvelle mission : ${data.clientName ?? 'nouvelle course'}`);
       setTimeout(() => setNotification(null), 4000);
     };
-    socket.on('mission:assigned', handler);
-    return () => { socket.off('mission:assigned', handler); };
+    const statusHandler = (data: { status?: string }) => {
+      if (data.status === 'cancelled') {
+        load();
+        setNotification('Une mission a été annulée');
+        setTimeout(() => setNotification(null), 4000);
+      }
+    };
+    socket.on('mission:assigned', assignHandler);
+    socket.on('mission:status', statusHandler);
+    return () => {
+      socket.off('mission:assigned', assignHandler);
+      socket.off('mission:status', statusHandler);
+    };
   }, [socketRef.current, load]);
 
   const filters = [
@@ -59,6 +70,7 @@ export default function MissionsPage() {
     { key: 'assigned',    label: 'Assignées' },
     { key: 'in_progress', label: 'En route' },
     { key: 'completed',   label: 'Livrées' },
+    { key: 'cancelled',   label: 'Annulées' },
   ];
 
   return (
