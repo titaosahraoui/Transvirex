@@ -26,51 +26,108 @@ export default function NewMissionPage() {
       });
       navigate(`/missions/${r.data.data.id}`);
     } catch {
-      setError('Failed to create mission. Please check your input.');
+      setError('Impossible de créer la mission. Vérifiez les informations saisies.');
     } finally { setLoading(false); }
   }
 
+  const fields = [
+    { label: 'Client',            field: 'clientName',      type: 'text',           ph: 'Mme Lefèvre',               req: true  },
+    { label: 'Adresse de pickup', field: 'pickupAddress',   type: 'text',           ph: 'Hub Paris-Est · 12 av. République', req: true  },
+    { label: 'Adresse de livraison', field: 'deliveryAddress', type: 'text',        ph: '14 rue Daguerre, 75014 Paris', req: true },
+    { label: 'Délai',             field: 'deadline',        type: 'datetime-local', ph: '',                           req: false },
+  ] as const;
+
   return (
-    <div className="min-h-screen bg-gray-100">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/board')} className="text-gray-400 hover:text-gray-700">← Back</button>
-        <h1 className="font-bold text-xl text-gray-800">New Mission</h1>
-      </header>
+    <div className="wf-shell">
+      {/* Sidebar */}
+      <aside className="wf-side">
+        <div className="side-logo">transvirex</div>
+        <div className="side-group">OPÉRATIONS</div>
+        <div className="side-nav" onClick={() => navigate('/board')}>
+          <span className="ic">📋</span> Missions
+        </div>
+        <div className="side-nav on">
+          <span className="ic">＋</span> Nouvelle mission
+        </div>
+      </aside>
 
-      <div className="max-w-xl mx-auto p-6">
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-6 space-y-4">
-          {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-2">{error}</div>}
+      <div className="wf-shell-main">
+        <div className="wf-appbar">
+          <span className="bar-crumbs">Missions / + Nouvelle mission</span>
+          <div className="bar-actions">
+            <button className="wf-btn" onClick={() => navigate('/board')}>← Annuler</button>
+          </div>
+        </div>
 
-          {[
-            { label: 'Client Name',       field: 'clientName',      type: 'text',     placeholder: 'Acme Corp' },
-            { label: 'Pickup Address',    field: 'pickupAddress',   type: 'text',     placeholder: '10 Rue de la Paix, Algiers' },
-            { label: 'Delivery Address',  field: 'deliveryAddress', type: 'text',     placeholder: '20 Boulevard Victor Hugo, Oran' },
-            { label: 'Deadline (optional)', field: 'deadline',      type: 'datetime-local', placeholder: '' },
-          ].map(({ label, field, type, placeholder }) => (
-            <div key={field}>
-              <label className="block text-sm text-gray-600 mb-1">{label}</label>
+        <div className="wf-shell-content" style={{ maxWidth: 680 }}>
+          <div className="script" style={{ fontSize: 30, marginBottom: 4 }}>Créer une mission</div>
+          <div className="mono muted" style={{ fontSize: 11, marginBottom: 18 }}>Remplissez les informations de la nouvelle course.</div>
+
+          {/* Stepper */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 20, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+            <span style={{ background: 'var(--ink)', color: '#fff', borderRadius: 99, padding: '1px 7px' }}>1</span>
+            <span>Trajet & client</span>
+            <span style={{ flex: 1, height: 0, borderTop: '1.4px dashed var(--ink-3)' }} />
+            <span style={{ background: '#fff', border: '1.4px solid var(--ink-3)', borderRadius: 99, padding: '0 7px' }}>2</span>
+            <span>Colis</span>
+            <span style={{ flex: 1, height: 0, borderTop: '1.4px dashed var(--ink-3)' }} />
+            <span style={{ background: '#fff', border: '1.4px solid var(--ink-3)', borderRadius: 99, padding: '0 7px' }}>3</span>
+            <span>Assignation</span>
+          </div>
+
+          {error && <div className="wf-error" style={{ marginBottom: 14 }}>{error}</div>}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              {fields.slice(0, 2).map(({ label, field, type, ph, req }) => (
+                <div key={field} className="wf-box solid" style={{ padding: '12px 14px' }}>
+                  <label className="wf-field-label">{label}{!req && ' (optionnel)'}</label>
+                  <input
+                    type={type} value={(form as any)[field]}
+                    onChange={e => set(field, e.target.value)}
+                    required={req} placeholder={ph}
+                    className="wf-inp" style={{ marginTop: 6 }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="wf-box solid" style={{ padding: '12px 14px' }}>
+              <label className="wf-field-label">Adresse de livraison</label>
               <input
-                type={type}
-                value={(form as any)[field]}
-                onChange={e => set(field, e.target.value)}
-                required={field !== 'deadline'}
-                placeholder={placeholder}
-                className="w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                type="text" value={form.deliveryAddress}
+                onChange={e => set('deliveryAddress', e.target.value)}
+                required placeholder="14 rue Daguerre, 75014 Paris"
+                className="wf-inp" style={{ marginTop: 6 }}
               />
             </div>
-          ))}
 
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={() => navigate('/board')}
-              className="flex-1 border border-gray-200 text-gray-600 rounded-lg py-2.5 hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 transition-colors">
-              {loading ? 'Creating…' : 'Create Mission'}
-            </button>
-          </div>
-        </form>
+            <div className="wf-box" style={{ padding: '12px 14px' }}>
+              <label className="wf-field-label">Créneau de livraison</label>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                <span className="wf-pill warn">ASAP</span>
+                <span className="wf-pill">≤ 2h</span>
+                <span className="wf-pill">Aujourd'hui</span>
+                <span className="wf-pill">Demain</span>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <label className="wf-field-label">Délai précis (optionnel)</label>
+                <input
+                  type="datetime-local" value={form.deadline}
+                  onChange={e => set('deadline', e.target.value)}
+                  className="wf-inp box" style={{ marginTop: 4 }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
+              <button type="button" className="wf-btn" onClick={() => navigate('/board')}>← Annuler</button>
+              <button type="submit" disabled={loading} className="wf-btn fill">
+                {loading ? 'Création…' : 'Créer la mission →'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );

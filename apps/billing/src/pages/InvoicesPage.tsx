@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
 
 interface Invoice {
@@ -7,15 +6,23 @@ interface Invoice {
   amount: string; status: string; generatedAt: string; paidAt: string | null;
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  sent:  'bg-blue-100 text-blue-700',
-  paid:  'bg-green-100 text-green-700',
+const STATUS_LABEL: Record<string, string> = {
+  draft: 'Brouillon', sent: 'Envoyée', paid: 'Payée',
 };
+const STATUS_PILL: Record<string, string> = {
+  draft: '', sent: 'warn', paid: 'good',
+};
+
+const billingNav = [
+  'FACTURATION',
+  { key: 'inv',   icon: '🧾', label: 'Factures' },
+  { key: 'stats', icon: '📊', label: 'Statistiques' },
+  'PARAMÈTRES',
+  { key: 'set',   icon: '⚙',  label: 'Paramètres' },
+];
 
 export default function InvoicesPage() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filter, setFilter]     = useState('all');
   const [loading, setLoading]   = useState(true);
@@ -46,7 +53,7 @@ export default function InvoicesPage() {
       setShowNew(false);
       setNewForm({ missionId: '', clientName: '', amount: '' });
       load();
-    } catch { alert('Failed to create invoice'); }
+    } catch { console.error('Impossible de créer la facture'); }
     finally { setCreating(false); }
   }
 
@@ -54,119 +61,176 @@ export default function InvoicesPage() {
     try {
       await api.patch(`/billing/invoices/${id}/status`, { status });
       load();
-    } catch { alert(`Cannot transition to ${status}`); }
+    } catch { console.error(`Impossible de passer à : ${status}`); }
   }
 
+  const total = invoices.reduce((s, inv) => s + parseFloat(inv.amount), 0);
+  const paidTotal = invoices.filter(i => i.status === 'paid').reduce((s, inv) => s + parseFloat(inv.amount), 0);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-xl text-gray-800">Invoices</h1>
-          <p className="text-sm text-gray-500">{user?.name}</p>
-        </div>
-        <div className="flex gap-3">
-          <button onClick={() => setShowNew(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            + Generate Invoice
-          </button>
-          <button onClick={logout} className="text-sm text-gray-400 hover:text-gray-700">Sign out</button>
-        </div>
-      </header>
+    <div className="wf-shell">
+      {/* Sidebar */}
+      <aside className="wf-side">
+        <div className="side-logo">transvirex</div>
+        <div className="side-role">Facturation · {user?.name}</div>
 
-      {/* Filter */}
-      <div className="flex gap-2 px-6 py-3 bg-white border-b">
-        {['all', 'draft', 'sent', 'paid'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className={`px-3 py-1 rounded-full text-sm font-medium transition-colors capitalize
-              ${filter === f ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
-            {f}
-          </button>
-        ))}
-      </div>
+        {billingNav.map((item, i) => {
+          if (typeof item === 'string') return <div key={i} className="side-group">{item}</div>;
+          return (
+            <div key={item.key} className={`side-nav ${item.key === 'inv' ? 'on' : ''}`}>
+              <span className="ic">{item.icon}</span> {item.label}
+              {item.key === 'inv' && <span className="side-tag">{invoices.length}</span>}
+            </div>
+          );
+        })}
 
-      {/* New invoice modal */}
-      {showNew && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h2 className="font-bold text-lg text-gray-800">Generate Invoice</h2>
-            {[
-              { label: 'Mission ID', field: 'missionId', type: 'text' },
-              { label: 'Client Name', field: 'clientName', type: 'text' },
-              { label: 'Amount (DZD)', field: 'amount', type: 'number' },
-            ].map(({ label, field, type }) => (
-              <div key={field}>
-                <label className="block text-sm text-gray-600 mb-1">{label}</label>
-                <input type={type} value={(newForm as any)[field]}
-                  onChange={e => setNewForm(p => ({ ...p, [field]: e.target.value }))}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-2 outline-none focus:ring-2 focus:ring-emerald-500" />
-              </div>
+        <div className="side-bottom">
+          <div className="side-logout" onClick={logout}>↩ Déconnexion</div>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="wf-shell-main">
+        <div className="wf-appbar">
+          <span className="bar-crumbs">Facturation / Factures</span>
+          <div className="bar-actions">
+            {/* Filter pills */}
+            {['all', 'draft', 'sent', 'paid'].map(f => (
+              <span
+                key={f}
+                className={`wf-pill${filter === f ? ' fill' : ''}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => setFilter(f)}
+              >
+                {f === 'all' ? 'Toutes' : STATUS_LABEL[f]}
+              </span>
             ))}
-            <div className="flex gap-3">
-              <button onClick={() => setShowNew(false)}
-                className="flex-1 border border-gray-200 rounded-lg py-2 text-gray-600 hover:bg-gray-50">Cancel</button>
-              <button onClick={createInvoice} disabled={creating}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg py-2 font-medium">
-                {creating ? 'Creating…' : 'Create'}
-              </button>
+            <button className="wf-btn fill" onClick={() => setShowNew(true)}>＋ Nouvelle facture</button>
+          </div>
+        </div>
+
+        <div className="wf-shell-content">
+          {/* KPI summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="wf-kpi">
+              <div className="mono muted" style={{ fontSize: 10, marginBottom: 4 }}>TOTAL FACTURÉ</div>
+              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-script)' }}>
+                {total.toLocaleString('fr-FR')} DZD
+              </div>
+            </div>
+            <div className="wf-kpi">
+              <div className="mono muted" style={{ fontSize: 10, marginBottom: 4 }}>ENCAISSÉ</div>
+              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-script)', color: 'var(--good)' }}>
+                {paidTotal.toLocaleString('fr-FR')} DZD
+              </div>
+            </div>
+            <div className="wf-kpi">
+              <div className="mono muted" style={{ fontSize: 10, marginBottom: 4 }}>EN ATTENTE</div>
+              <div style={{ fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-script)', color: 'var(--accent)' }}>
+                {(total - paidTotal).toLocaleString('fr-FR')} DZD
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Table */}
-      <div className="p-6">
-        {loading ? (
-          <div className="text-center text-gray-400 py-12">Loading…</div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  {['Client', 'Mission ID', 'Amount', 'Status', 'Generated', 'Actions'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">{h}</th>
+          {/* Modal: nouvelle facture */}
+          {showNew && (
+            <div style={{
+              position: 'fixed', inset: 0, background: 'rgba(31,29,26,.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20,
+            }}>
+              <div className="wf-box solid" style={{ width: '100%', maxWidth: 440, padding: '20px 22px' }}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
+                  <span className="script">Générer une facture</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[
+                    { label: 'ID Mission',    field: 'missionId',  type: 'text'   },
+                    { label: 'Nom client',    field: 'clientName', type: 'text'   },
+                    { label: 'Montant (DZD)', field: 'amount',     type: 'number' },
+                  ].map(({ label, field, type }) => (
+                    <div key={field}>
+                      <label className="wf-field-label">{label}</label>
+                      <input
+                        type={type}
+                        value={(newForm as any)[field]}
+                        onChange={e => setNewForm(p => ({ ...p, [field]: e.target.value }))}
+                        className="wf-inp box" style={{ width: '100%', marginTop: 4 }}
+                      />
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {invoices.map(inv => (
-                  <tr key={inv.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{inv.clientName}</td>
-                    <td className="px-4 py-3 text-gray-500 font-mono text-xs">{inv.missionId.slice(0, 8)}…</td>
-                    <td className="px-4 py-3 font-semibold">{parseFloat(inv.amount).toLocaleString()} DZD</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_STYLE[inv.status]}`}>
-                        {inv.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{new Date(inv.generatedAt).toLocaleDateString()}</td>
-                    <td className="px-4 py-3 flex gap-2">
-                      {inv.status === 'draft' && (
-                        <button onClick={() => markStatus(inv.id, 'sent')}
-                          className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded transition-colors">
-                          Mark Sent
-                        </button>
-                      )}
-                      {inv.status === 'sent' && (
-                        <button onClick={() => markStatus(inv.id, 'paid')}
-                          className="text-xs bg-green-50 text-green-600 hover:bg-green-100 px-2 py-1 rounded transition-colors">
-                          Mark Paid
-                        </button>
-                      )}
-                      {inv.status === 'paid' && (
-                        <span className="text-xs text-gray-400">
-                          {inv.paidAt ? new Date(inv.paidAt).toLocaleDateString() : 'Paid'}
-                        </span>
-                      )}
-                    </td>
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
+                    <button className="wf-btn" onClick={() => setShowNew(false)}>Annuler</button>
+                    <button className="wf-btn fill" disabled={creating} onClick={createInvoice}>
+                      {creating ? 'Création…' : 'Créer'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Invoices table */}
+          {loading ? (
+            <div className="mono muted" style={{ textAlign: 'center', padding: '40px 0', fontSize: 12 }}>Chargement…</div>
+          ) : (
+            <div className="wf-box solid" style={{ padding: 0, overflow: 'hidden' }}>
+              <table className="wf-table">
+                <thead>
+                  <tr>
+                    {['Client', 'Mission', 'Montant', 'Statut', 'Générée le', 'Actions'].map(h => (
+                      <th key={h}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-                {invoices.length === 0 && (
-                  <tr><td colSpan={6} className="text-center text-gray-400 py-12">No invoices found</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody>
+                  {invoices.map(inv => (
+                    <tr key={inv.id}>
+                      <td><b>{inv.clientName}</b></td>
+                      <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                        {inv.missionId.slice(0, 8)}…
+                      </td>
+                      <td style={{ fontWeight: 700 }}>
+                        {parseFloat(inv.amount).toLocaleString('fr-FR')} DZD
+                      </td>
+                      <td>
+                        <span className={`wf-pill ${STATUS_PILL[inv.status] ?? ''}`} style={{ fontSize: 10 }}>
+                          {STATUS_LABEL[inv.status] ?? inv.status}
+                        </span>
+                      </td>
+                      <td className="mono" style={{ fontSize: 11 }}>
+                        {new Date(inv.generatedAt).toLocaleDateString('fr-FR')}
+                      </td>
+                      <td>
+                        {inv.status === 'draft' && (
+                          <button className="wf-btn sm warn" onClick={() => markStatus(inv.id, 'sent')}>
+                            Envoyer
+                          </button>
+                        )}
+                        {inv.status === 'sent' && (
+                          <button className="wf-btn sm good" onClick={() => markStatus(inv.id, 'paid')}>
+                            Marquer payée
+                          </button>
+                        )}
+                        {inv.status === 'paid' && (
+                          <span className="mono muted" style={{ fontSize: 10 }}>
+                            {inv.paidAt ? new Date(inv.paidAt).toLocaleDateString('fr-FR') : '✓'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                  {invoices.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '32px 0' }}>
+                        — Aucune facture —
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

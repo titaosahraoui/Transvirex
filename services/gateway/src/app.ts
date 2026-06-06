@@ -17,10 +17,14 @@ const BILLING_URL  = process.env.BILLING_SERVICE_URL  ?? 'http://localhost:4003'
 const AI_URL       = process.env.AI_SERVICE_URL       ?? 'http://localhost:4004';
 
 // ── Proxy factory ────────────────────────────────────────────────────────────
-function proxyTo(target: string) {
+// Express's app.use('/prefix', middleware) strips the prefix from req.url before
+// the middleware sees it. pathRewrite re-attaches the prefix so the upstream
+// service receives the full path (e.g. /auth/register, not just /register).
+function proxyTo(target: string, prefix: string) {
   return createProxyMiddleware({
     target,
     changeOrigin: true,
+    pathRewrite: { '^/': `/${prefix}/` },
     on: {
       // res can be Socket | Response depending on whether the connection was upgraded;
       // cast to any and guard with 'status in res' to handle both cases safely.
@@ -53,18 +57,18 @@ app.get('/health', (_req, res) => {
 
 // ── Proxied routes ───────────────────────────────────────────────────────────
 //  Auth service handles: /auth/* (login, register, me) + /drivers/* + /users/*
-app.use('/auth',     jwtGuard, proxyTo(AUTH_URL));
-app.use('/drivers',  jwtGuard, proxyTo(AUTH_URL));
-app.use('/users',    jwtGuard, proxyTo(AUTH_URL));
+app.use('/auth',     jwtGuard, proxyTo(AUTH_URL,    'auth'));
+app.use('/drivers',  jwtGuard, proxyTo(AUTH_URL,    'drivers'));
+app.use('/users',    jwtGuard, proxyTo(AUTH_URL,    'users'));
 
 // Mission service handles: /missions/*
-app.use('/missions', jwtGuard, proxyTo(MISSION_URL));
+app.use('/missions', jwtGuard, proxyTo(MISSION_URL, 'missions'));
 
 // Billing service handles: /billing/*
-app.use('/billing',  jwtGuard, proxyTo(BILLING_URL));
+app.use('/billing',  jwtGuard, proxyTo(BILLING_URL, 'billing'));
 
 // AI service handles: /ai/*
-app.use('/ai',       jwtGuard, proxyTo(AI_URL));
+app.use('/ai',       jwtGuard, proxyTo(AI_URL,      'ai'));
 
 // ── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => {

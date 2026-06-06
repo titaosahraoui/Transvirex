@@ -15,7 +15,22 @@ interface Driver {
 }
 interface Mission { id: string; status: string; createdAt: string; }
 
-const PIE_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444'];
+const DRIVER_STATUS_LABEL: Record<string, string> = {
+  available: 'Disponible', on_mission: 'En mission', offline: 'Hors ligne',
+};
+const DRIVER_STATUS_PILL: Record<string, string> = {
+  available: 'good', on_mission: 'warn', offline: '',
+};
+const PIE_COLORS = ['var(--ink-3)', 'var(--hi)', 'var(--accent)', 'var(--good)', 'var(--bad)'];
+
+const mgmtNav = [
+  'PERFORMANCE',
+  { key: 'dash',  icon: '📊', label: 'Tableau de bord' },
+  { key: 'sla',   icon: '⏱',  label: 'SLA & délais' },
+  'FLOTTE',
+  { key: 'drv',   icon: '🚐', label: 'Chauffeurs' },
+  { key: 'geo',   icon: '🗺',  label: 'Géographie' },
+];
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
@@ -29,128 +44,155 @@ export default function DashboardPage() {
     api.get('/missions').then(r => setMissions(r.data.data)).catch(console.error);
   }, []);
 
-  // Build status distribution for pie chart
-  const statusCounts = ['pending', 'assigned', 'in_progress', 'completed', 'failed'].map(s => ({
-    name: s.replace('_', ' '),
+  const statusCounts = ['pending','assigned','in_progress','completed','failed'].map((s, i) => ({
+    name: ['À assigner','Assignées','En route','Livrées','Échecs'][i],
     value: missions.filter(m => m.status === s).length,
   })).filter(s => s.value > 0);
 
-  // Driver performance sorted by acceptance rate
   const sortedDrivers = [...drivers].sort(
     (a, b) => parseFloat(b.acceptanceRate) - parseFloat(a.acceptanceRate)
   );
 
-  // Revenue KPI cards
   const kpis = [
-    { label: 'Total Revenue', value: stats ? `${parseFloat(stats.totalRevenue).toLocaleString()} DZD` : '—', icon: '💰', color: 'bg-green-50 text-green-700' },
-    { label: 'Paid Invoices', value: stats?.paidCount ?? '—', icon: '✅', color: 'bg-blue-50 text-blue-700' },
-    { label: 'Pending Payment', value: stats ? String(parseInt(stats.draftCount) + parseInt(stats.sentCount)) : '—', icon: '⏳', color: 'bg-yellow-50 text-yellow-700' },
-    { label: 'Avg Days to Pay', value: stats ? `${parseFloat(stats.avgDaysToPayment).toFixed(1)} days` : '—', icon: '📅', color: 'bg-indigo-50 text-indigo-700' },
-    { label: 'Total Missions', value: String(missions.length), icon: '📋', color: 'bg-purple-50 text-purple-700' },
-    { label: 'Active Drivers', value: String(drivers.filter(d => d.status === 'available').length), icon: '🚚', color: 'bg-emerald-50 text-emerald-700' },
+    { label: 'Revenu total',        value: stats ? `${parseFloat(stats.totalRevenue).toLocaleString('fr-FR')} DZD` : '—', icon: '💰' },
+    { label: 'Factures payées',     value: stats?.paidCount ?? '—',                                                        icon: '✅' },
+    { label: 'En attente paiement', value: stats ? String(+stats.draftCount + +stats.sentCount) : '—',                     icon: '⏳' },
+    { label: 'Délai moyen',         value: stats ? `${parseFloat(stats.avgDaysToPayment).toFixed(1)} j` : '—',             icon: '📅' },
+    { label: 'Total missions',      value: String(missions.length),                                                         icon: '📋' },
+    { label: 'Chauffeurs actifs',   value: String(drivers.filter(d => d.status === 'available').length),                   icon: '🚐' },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-xl text-gray-800">Management Dashboard</h1>
-          <p className="text-sm text-gray-500">{user?.name}</p>
-        </div>
-        <button onClick={logout} className="text-sm text-gray-400 hover:text-gray-700">Sign out</button>
-      </header>
+    <div className="wf-shell">
+      {/* Sidebar */}
+      <aside className="wf-side">
+        <div className="side-logo">transvirex</div>
+        <div className="side-role">Direction · {user?.name}</div>
 
-      <div className="p-6 space-y-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {kpis.map(kpi => (
-            <div key={kpi.label} className={`rounded-2xl p-4 ${kpi.color}`}>
-              <div className="text-2xl mb-1">{kpi.icon}</div>
-              <div className="font-bold text-lg">{kpi.value}</div>
-              <div className="text-xs opacity-70">{kpi.label}</div>
+        {mgmtNav.map((item, i) => {
+          if (typeof item === 'string') return <div key={i} className="side-group">{item}</div>;
+          return (
+            <div key={item.key} className={`side-nav ${item.key === 'dash' ? 'on' : ''}`}>
+              <span className="ic">{item.icon}</span> {item.label}
             </div>
-          ))}
+          );
+        })}
+
+        <div className="side-bottom">
+          <div className="side-logout" onClick={logout}>↩ Déconnexion</div>
         </div>
+      </aside>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Mission status pie chart */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-semibold text-gray-800 mb-4">Mission Status Distribution</h2>
-            {statusCounts.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie data={statusCounts} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                    {statusCounts.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : <p className="text-gray-400 text-center py-12">No mission data</p>}
-          </div>
-
-          {/* Invoice status bar chart */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <h2 className="font-semibold text-gray-800 mb-4">Invoice Pipeline</h2>
-            {stats ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={[
-                  { name: 'Draft', count: parseInt(stats.draftCount) },
-                  { name: 'Sent',  count: parseInt(stats.sentCount)  },
-                  { name: 'Paid',  count: parseInt(stats.paidCount)  },
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : <p className="text-gray-400 text-center py-12">Loading…</p>}
+      {/* Main */}
+      <div className="wf-shell-main">
+        <div className="wf-appbar">
+          <span className="bar-crumbs">Direction / Tableau de bord</span>
+          <div className="bar-actions">
+            <span className="mono muted" style={{ fontSize: 11 }}>
+              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </span>
           </div>
         </div>
 
-        {/* Driver Performance Table */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b">
-            <h2 className="font-semibold text-gray-800">Driver Performance</h2>
+        <div className="wf-shell-content">
+          {/* KPI row */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 18 }}>
+            {kpis.map(kpi => (
+              <div key={kpi.label} className="wf-kpi">
+                <div style={{ fontSize: 20, marginBottom: 4 }}>{kpi.icon}</div>
+                <div style={{ fontSize: 18, fontWeight: 700, fontFamily: 'var(--font-script)' }}>{kpi.value}</div>
+                <div className="mono muted" style={{ fontSize: 10, marginTop: 2 }}>{kpi.label}</div>
+              </div>
+            ))}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50">
+
+          {/* Charts row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 18 }}>
+            {/* Pie */}
+            <div className="wf-box solid" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Répartition des missions</div>
+              {statusCounts.length > 0 ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={statusCounts} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={72} label>
+                      {statusCounts.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip />
+                    <Legend iconType="circle" iconSize={8} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="mono muted" style={{ textAlign: 'center', padding: '40px 0', fontSize: 11 }}>Aucune donnée</div>
+              )}
+            </div>
+
+            {/* Bar */}
+            <div className="wf-box solid" style={{ padding: '14px 16px' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10 }}>Pipeline facturation</div>
+              {stats ? (
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={[
+                    { name: 'Brouillon', count: parseInt(stats.draftCount) },
+                    { name: 'Envoyée',   count: parseInt(stats.sentCount)  },
+                    { name: 'Payée',     count: parseInt(stats.paidCount)  },
+                  ]} barSize={28}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--paper-3)" />
+                    <XAxis dataKey="name" tick={{ fontFamily: 'var(--font-mono)', fontSize: 10 }} />
+                    <YAxis allowDecimals={false} tick={{ fontFamily: 'var(--font-mono)', fontSize: 10 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="var(--hi)" stroke="var(--ink)" strokeWidth={1.2} radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="mono muted" style={{ textAlign: 'center', padding: '40px 0', fontSize: 11 }}>Chargement…</div>
+              )}
+            </div>
+          </div>
+
+          {/* Driver table */}
+          <div className="wf-box solid" style={{ padding: 0, overflow: 'hidden' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1.3px dashed rgba(31,29,26,.2)', fontWeight: 700, fontSize: 13 }}>
+              Performance chauffeurs
+            </div>
+            <table className="wf-table">
+              <thead>
                 <tr>
-                  {['Driver', 'Status', 'Acceptance Rate', 'Current Load', 'Experience'].map(h => (
-                    <th key={h} className="text-left px-4 py-3 text-gray-500 font-medium">{h}</th>
+                  {['Chauffeur', 'Statut', 'Taux d\'acceptation', 'Charge actuelle', 'Expérience'].map(h => (
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {sortedDrivers.map(d => (
-                  <tr key={d.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-800">{d.name}</td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium
-                        ${d.status === 'available'   ? 'bg-green-100 text-green-700' :
-                          d.status === 'on_mission'  ? 'bg-blue-100 text-blue-700'  :
-                          'bg-gray-100 text-gray-600'}`}>
-                        {d.status}
+                  <tr key={d.id}>
+                    <td><b>{d.name}</b></td>
+                    <td>
+                      <span className={`wf-pill ${DRIVER_STATUS_PILL[d.status] ?? ''}`} style={{ fontSize: 10 }}>
+                        {DRIVER_STATUS_LABEL[d.status] ?? d.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-gray-100 rounded-full h-2">
-                          <div className="bg-indigo-500 h-2 rounded-full"
-                            style={{ width: `${parseFloat(d.acceptanceRate)}%` }} />
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ flex: 1, height: 6, background: 'var(--paper-3)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%', borderRadius: 3,
+                            width: `${parseFloat(d.acceptanceRate)}%`,
+                            background: parseFloat(d.acceptanceRate) >= 80 ? 'var(--good)' : parseFloat(d.acceptanceRate) >= 60 ? 'var(--hi)' : 'var(--bad)',
+                          }} />
                         </div>
-                        <span className="text-xs text-gray-600">{parseFloat(d.acceptanceRate).toFixed(0)}%</span>
+                        <span className="mono" style={{ fontSize: 10 }}>{parseFloat(d.acceptanceRate).toFixed(0)}%</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{d.currentLoad} missions</td>
-                    <td className="px-4 py-3 text-gray-600">{d.experienceDays} days</td>
+                    <td className="mono" style={{ fontSize: 12 }}>{d.currentLoad} course{d.currentLoad !== 1 ? 's' : ''}</td>
+                    <td className="mono" style={{ fontSize: 12 }}>{d.experienceDays} j</td>
                   </tr>
                 ))}
                 {sortedDrivers.length === 0 && (
-                  <tr><td colSpan={5} className="text-center text-gray-400 py-8">No drivers found</td></tr>
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '24px 0' }}>
+                      Aucun chauffeur trouvé
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>

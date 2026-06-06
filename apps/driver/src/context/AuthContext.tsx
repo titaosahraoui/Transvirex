@@ -24,6 +24,7 @@ interface AuthContextValue {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string, phone?: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -54,6 +55,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(u);
   }
 
+  async function register(email: string, password: string, name: string, phone?: string) {
+    const r = await api.post('/auth/register', { email, password, name, phone, role: 'driver' });
+    const { token: t, user: u } = r.data.data;
+    localStorage.setItem('jwt_token', t);
+    setToken(t);
+    setUser(u);
+  }
+
   function logout() {
     localStorage.removeItem('jwt_token');
     setToken(null);
@@ -61,7 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

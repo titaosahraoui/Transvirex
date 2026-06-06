@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
@@ -17,34 +17,49 @@ export default function LoginPage() {
       await login(email, password);
       navigate('/board');
     } catch {
-      setError('Invalid email or password');
+      setError('Email ou mot de passe incorrect');
     } finally { setLoading(false); }
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-3xl font-bold text-gray-800 text-center mb-1">Transvirex</h1>
-        <p className="text-gray-500 text-center mb-8">Dispatcher Dashboard</p>
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-8 space-y-4">
-          {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-2">{error}</div>}
+    <div className="wf-login">
+      <div className="wf-login-card">
+        <div className="wf-login-brand">transvirex<span style={{ color: 'var(--accent)' }}>.</span></div>
+        <div className="wf-login-sub">Dispatcher · Hub opérations</div>
+
+        {error && <div className="wf-error">{error}</div>}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="dispatcher@transvirex.com" />
+            <label className="wf-field-label">Email</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              className="wf-inp box"
+              placeholder="dispatcher@transvirex.fr"
+              style={{ width: '100%' }}
+            />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="••••••••" />
+            <label className="wf-field-label">Mot de passe</label>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              className="wf-inp box"
+              placeholder="••••••••"
+              style={{ width: '100%' }}
+            />
           </div>
-          <button type="submit" disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 transition-colors">
-            {loading ? 'Signing in…' : 'Sign In'}
+          <button type="submit" disabled={loading} className="wf-btn fill block" style={{ marginTop: 6 }}>
+            {loading ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
+
+        <hr className="wf-wave" />
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
+          Pas encore de compte ?{' '}
+          <Link to="/register" style={{ color: 'var(--ink)', fontWeight: 700, textDecoration: 'underline dotted' }}>
+            Créer un compte
+          </Link>
+        </p>
       </div>
     </div>
   );

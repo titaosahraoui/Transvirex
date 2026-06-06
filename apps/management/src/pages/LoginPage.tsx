@@ -1,44 +1,63 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState('');
+  const [loading, setLoading]   = useState(false);
 
   async function handleSubmit(e: FormEvent) {
-    e.preventDefault(); setError(''); setLoading(true);
-    try { await login(email, password); navigate('/dashboard'); }
-    catch { setError('Invalid email or password'); }
-    finally { setLoading(false); }
+    e.preventDefault();
+    setError(''); setLoading(true);
+    try {
+      await login(email, password);
+      navigate('/dashboard');
+    } catch {
+      setError('Email ou mot de passe incorrect');
+    } finally { setLoading(false); }
   }
 
   return (
-    <div className="min-h-screen bg-indigo-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        <h1 className="text-3xl font-bold text-gray-800 text-center mb-1">Transvirex</h1>
-        <p className="text-gray-500 text-center mb-8">Management Dashboard</p>
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm p-8 space-y-4">
-          {error && <div className="bg-red-50 text-red-600 text-sm rounded-lg px-4 py-2">{error}</div>}
+    <div className="wf-login">
+      <div className="wf-login-card">
+        <div className="wf-login-brand">transvirex<span style={{ color: 'var(--accent)' }}>.</span></div>
+        <div className="wf-login-sub">Direction · Tableau de bord</div>
+
+        {error && <div className="wf-error">{error}</div>}
+
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Email</label>
-            <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500" />
+            <label className="wf-field-label">Email</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)} required
+              className="wf-inp box" placeholder="direction@transvirex.fr"
+              style={{ width: '100%' }}
+            />
           </div>
           <div>
-            <label className="block text-sm text-gray-600 mb-1">Password</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 outline-none focus:ring-2 focus:ring-indigo-500" />
+            <label className="wf-field-label">Mot de passe</label>
+            <input
+              type="password" value={password} onChange={e => setPassword(e.target.value)} required
+              className="wf-inp box" placeholder="••••••••"
+              style={{ width: '100%' }}
+            />
           </div>
-          <button type="submit" disabled={loading}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold rounded-lg py-2.5 transition-colors">
-            {loading ? 'Signing in…' : 'Sign In'}
+          <button type="submit" disabled={loading} className="wf-btn fill block" style={{ marginTop: 6 }}>
+            {loading ? 'Connexion…' : 'Se connecter'}
           </button>
         </form>
+
+        <hr className="wf-wave" />
+        <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
+          Pas encore de compte ?{' '}
+          <Link to="/register" style={{ color: 'var(--ink)', fontWeight: 700, textDecoration: 'underline dotted' }}>
+            Créer un compte
+          </Link>
+        </p>
       </div>
     </div>
   );

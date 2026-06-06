@@ -3,28 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
 
 interface Mission {
-  id: string;
-  clientName: string;
-  pickupAddress: string;
-  deliveryAddress: string;
-  deadline: string | null;
-  status: string;
-  driverId: string | null;
-  createdAt: string;
+  id: string; clientName: string; pickupAddress: string;
+  deliveryAddress: string; deadline: string | null; status: string;
+  driverId: string | null; createdAt: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  assigned:    'bg-yellow-500/20 text-yellow-300',
-  in_progress: 'bg-blue-500/20 text-blue-300',
-  completed:   'bg-green-500/20 text-green-300',
-  failed:      'bg-red-500/20 text-red-300',
-};
-
 const STATUS_LABEL: Record<string, string> = {
-  assigned:    'Assigned',
-  in_progress: 'In Progress',
-  completed:   'Completed',
-  failed:      'Failed',
+  assigned: 'Assignée', in_progress: 'En route', completed: 'Livrée', failed: 'Échec',
+};
+const STATUS_PILL: Record<string, string> = {
+  assigned: 'warn', in_progress: 'warn', completed: 'good', failed: 'bad',
 };
 
 export default function MissionsPage() {
@@ -32,101 +20,112 @@ export default function MissionsPage() {
   const navigate = useNavigate();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading]   = useState(true);
-  const [filter, setFilter]     = useState<string>('all');
+  const [filter, setFilter]     = useState('all');
 
-  // Fetch driver profile → then fetch driver's missions
   const load = useCallback(async () => {
     if (!user) return;
     try {
-      setLoading(true);
-      // Get the driver record linked to this user
       const driverRes = await api.get(`/drivers/by-user/${user.id}`);
       const driverId: string = driverRes.data.data.id;
-
       const url = filter === 'all'
         ? `/missions?driverId=${driverId}`
         : `/missions?driverId=${driverId}&status=${filter}`;
-
       const r = await api.get(url);
       setMissions(r.data.data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
   }, [user, filter]);
 
   useEffect(() => { load(); }, [load]);
 
-  const filters = ['all', 'assigned', 'in_progress', 'completed', 'failed'];
+  const filters = [
+    { key: 'all',         label: 'Toutes' },
+    { key: 'assigned',    label: 'Assignées' },
+    { key: 'in_progress', label: 'En route' },
+    { key: 'completed',   label: 'Livrées' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="wf-phone">
       {/* Header */}
-      <header className="bg-gray-800 px-4 py-4 flex items-center justify-between sticky top-0 z-10">
+      <div className="wf-phone-header">
         <div>
-          <p className="text-xs text-gray-400">Welcome</p>
-          <h1 className="font-bold">{user?.name}</h1>
+          <div className="mono muted" style={{ fontSize: 10 }}>Bonjour,</div>
+          <div style={{ fontWeight: 700, fontSize: 15 }}>{user?.name}</div>
         </div>
-        <button onClick={logout} className="text-xs text-gray-400 hover:text-white">
-          Sign out
-        </button>
-      </header>
+        <span className="mono muted" style={{ fontSize: 11, cursor: 'pointer' }} onClick={logout}>
+          ↩ Déco
+        </span>
+      </div>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 px-4 py-3 overflow-x-auto">
+      {/* Title */}
+      <div style={{ padding: '16px 16px 8px' }}>
+        <div className="script" style={{ fontSize: 26 }}>Mes missions</div>
+        <div className="mono muted" style={{ fontSize: 10.5 }}>{missions.length} course{missions.length !== 1 ? 's' : ''} trouvée{missions.length !== 1 ? 's' : ''}</div>
+      </div>
+
+      {/* Filter pills */}
+      <div style={{ display: 'flex', gap: 6, padding: '0 16px 12px', overflowX: 'auto' }}>
         {filters.map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`shrink-0 px-3 py-1 rounded-full text-sm font-medium transition-colors
-              ${filter === f ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}
+          <span
+            key={f.key}
+            className={`wf-pill${filter === f.key ? ' fill' : ''}`}
+            style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
+            onClick={() => setFilter(f.key)}
           >
-            {f === 'all' ? 'All' : STATUS_LABEL[f]}
-          </button>
+            {f.label}
+          </span>
         ))}
       </div>
 
-      {/* Mission list */}
-      <div className="px-4 pb-24 space-y-3">
+      {/* Mission cards */}
+      <div style={{ padding: '0 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
         {loading && (
-          <div className="text-center text-gray-400 py-12">Loading missions…</div>
+          <div className="mono muted" style={{ textAlign: 'center', padding: '32px 0', fontSize: 12 }}>
+            Chargement…
+          </div>
         )}
         {!loading && missions.length === 0 && (
-          <div className="text-center text-gray-400 py-12">No missions found</div>
+          <div className="wf-box tint" style={{ textAlign: 'center', padding: '24px 0' }}>
+            <div className="mono muted" style={{ fontSize: 12 }}>Aucune mission trouvée</div>
+          </div>
         )}
         {missions.map(m => (
-          <button
+          <div
             key={m.id}
+            className="wf-box solid"
+            style={{ cursor: 'pointer', padding: '10px 12px' }}
             onClick={() => navigate(`/missions/${m.id}`)}
-            className="w-full bg-gray-800 rounded-2xl p-4 text-left hover:bg-gray-750 transition-colors"
           >
-            <div className="flex items-start justify-between mb-2">
-              <span className="font-semibold">{m.clientName}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[m.status] ?? 'bg-gray-600 text-gray-300'}`}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>
+                {m.id.slice(0, 8)}
+              </span>
+              <span className={`wf-pill ${STATUS_PILL[m.status] ?? ''}`} style={{ fontSize: 10 }}>
                 {STATUS_LABEL[m.status] ?? m.status}
               </span>
             </div>
-            <p className="text-sm text-gray-400 mb-1">📍 {m.pickupAddress}</p>
-            <p className="text-sm text-gray-400">🏁 {m.deliveryAddress}</p>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 6 }}>{m.clientName}</div>
+            <div className="mono muted" style={{ fontSize: 10.5 }}>📍 {m.pickupAddress}</div>
+            <div className="mono muted" style={{ fontSize: 10.5, marginTop: 2 }}>🏁 {m.deliveryAddress}</div>
             {m.deadline && (
-              <p className="text-xs text-orange-400 mt-2">
-                ⏰ {new Date(m.deadline).toLocaleString()}
-              </p>
+              <div className="mono" style={{ fontSize: 10, color: 'var(--accent)', marginTop: 6 }}>
+                ⏱ {new Date(m.deadline).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              </div>
             )}
-          </button>
+          </div>
         ))}
       </div>
 
-      {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-gray-800 border-t border-gray-700 flex">
-        <button onClick={() => navigate('/missions')}
-          className="flex-1 py-4 text-blue-400 text-xs flex flex-col items-center gap-1">
-          <span className="text-xl">📋</span> Missions
+      {/* Tab bar */}
+      <nav className="wf-tabbar">
+        <button className="wf-tabbar-btn active" onClick={() => navigate('/missions')}>
+          <span style={{ fontSize: 18 }}>📋</span>
+          <span>Missions</span>
         </button>
-        <button onClick={() => navigate('/chat')}
-          className="flex-1 py-4 text-gray-400 text-xs flex flex-col items-center gap-1">
-          <span className="text-xl">💬</span> Chat
+        <button className="wf-tabbar-btn" onClick={() => navigate('/chat')}>
+          <span style={{ fontSize: 18 }}>💬</span>
+          <span>Messagerie</span>
         </button>
       </nav>
     </div>
