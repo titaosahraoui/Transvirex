@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api } from '../context/AuthContext';
+import { api, useAuth } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 
 interface Mission {
   id: string; clientName: string; pickupAddress: string; deliveryAddress: string;
@@ -23,17 +24,41 @@ const STATUS_PILL: Record<string, string> = {
 export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { token } = useAuth();
+  const socketRef = useSocket(token);
   const [mission, setMission]         = useState<Mission | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [drivers, setDrivers]         = useState<Driver[]>([]);
   const [aiLoading, setAiLoading]     = useState(false);
   const [assigning, setAssigning]     = useState(false);
   const [error, setError]             = useState('');
+  const [lastLocation, setLastLocation] = useState<{ lat: number; lng: number; age: number } | null>(null);
 
   useEffect(() => {
     api.get(`/missions/${id}`).then(r => setMission(r.data.data)).catch(console.error);
     api.get('/drivers?status=available').then(r => setDrivers(r.data.data)).catch(console.error);
   }, [id]);
+
+  // Real-time: receive GPS pings from the driver while in_progress
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const handler = (data: { missionId: string; lat: number; lng: number }) => {
+      if (data.missionId !== id) return;
+      setLastLocation({ lat: data.lat, lng: data.lng, age: 0 });
+    };
+    socket.on('driver:location', handler);
+    return () => { socket.off('driver:location', handler); };
+  }, [socketRef.current, id]);
+
+  // Tick the location age counter every second
+  useEffect(() => {
+    if (!lastLocation) return;
+    const t = setInterval(() => {
+      setLastLocation(prev => prev ? { ...prev, age: prev.age + 1 } : prev);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [lastLocation?.lat, lastLocation?.lng]);
 
   async function fetchAISuggestions() {
     setAiLoading(true); setSuggestions([]);
@@ -220,6 +245,19 @@ export default function MissionDetailPage() {
                     </div>
                     <span className={`wf-pill ${STATUS_PILL[mission.status]}`}>{statusLabel}</span>
                   </div>
+                  {mission.status === 'in_progress' && lastLocation && (
+                    <div className="mono" style={{ fontSize: 10.5, marginTop: 8, color: 'var(--accent)' }}>
+                      📍 En route — position reçue il y a {lastLocation.age}s
+                      <span style={{ color: 'var(--ink-3)', marginLeft: 6 }}>
+                        ({lastLocation.lat.toFixed(4)}, {lastLocation.lng.toFixed(4)})
+                      </span>
+                    </div>
+                  )}
+                  {mission.status === 'in_progress' && !lastLocation && (
+                    <div className="mono muted" style={{ fontSize: 10, marginTop: 6 }}>
+                      En attente de la position GPS…
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 
 interface Mission {
   id: string; clientName: string; pickupAddress: string;
@@ -16,11 +17,13 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 export default function MissionsPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const navigate = useNavigate();
-  const [missions, setMissions] = useState<Mission[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [filter, setFilter]     = useState('all');
+  const socketRef = useSocket(token);
+  const [missions, setMissions]     = useState<Mission[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [filter, setFilter]         = useState('all');
+  const [notification, setNotification] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -37,6 +40,19 @@ export default function MissionsPage() {
   }, [user, filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Real-time: receive assignment notification from dispatcher
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const handler = (data: { clientName?: string }) => {
+      load();
+      setNotification(`Nouvelle mission : ${data.clientName ?? 'nouvelle course'}`);
+      setTimeout(() => setNotification(null), 4000);
+    };
+    socket.on('mission:assigned', handler);
+    return () => { socket.off('mission:assigned', handler); };
+  }, [socketRef.current, load]);
 
   const filters = [
     { key: 'all',         label: 'Toutes' },
@@ -57,6 +73,15 @@ export default function MissionsPage() {
           ↩ Déco
         </span>
       </div>
+
+      {/* Assignment toast notification */}
+      {notification && (
+        <div style={{ position: 'fixed', top: 64, left: 0, right: 0, maxWidth: 430, margin: '0 auto', zIndex: 40, padding: '0 12px' }}>
+          <div className="wf-box tint" style={{ borderColor: 'var(--accent)', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
+            🚨 {notification}
+          </div>
+        </div>
+      )}
 
       {/* Title */}
       <div style={{ padding: '16px 16px 8px' }}>

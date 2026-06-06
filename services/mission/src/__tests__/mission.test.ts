@@ -2,6 +2,7 @@
  * Mission service tests
  * - pg pool is fully mocked — no real DB calls
  * - mongoose DeliveryEvent is mocked — no real Mongo calls
+ * - axios is mocked — no real HTTP calls to auth/notification services
  */
 
 // ── Mock pg ──────────────────────────────────────────────────────────────────
@@ -20,6 +21,16 @@ jest.mock('../db/mongo', () => ({
     find: mockFind,
     create: mockCreate,
   },
+}));
+
+// ── Mock axios (auth service lookups + notification posts) ────────────────────
+const mockAxiosGet  = jest.fn();
+const mockAxiosPost = jest.fn();
+jest.mock('axios', () => ({
+  __esModule: true,
+  default: { get: mockAxiosGet, post: mockAxiosPost },
+  get:  mockAxiosGet,
+  post: mockAxiosPost,
 }));
 
 import request from 'supertest';
@@ -55,6 +66,10 @@ const sampleMission = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Default axios responses so existing tests don't break
+  mockAxiosGet.mockResolvedValue({ data: { data: { userId: 'driver-user-uuid' } } });
+  mockAxiosPost.mockResolvedValue({ data: { status: 'success', data: { delivered: true } } });
+  mockCreate.mockResolvedValue({});
 });
 
 // ── Health ────────────────────────────────────────────────────────────────────
@@ -90,7 +105,6 @@ describe('GET /missions', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] });
     const res = await withUser(request(app).get('/missions?status=pending'));
     expect(res.status).toBe(200);
-    // The query should have been called with the status value
     expect(mockQuery).toHaveBeenCalledWith(
       expect.stringContaining('status'),
       expect.arrayContaining(['pending'])
@@ -141,13 +155,17 @@ describe('POST /missions', () => {
 
 // ── PATCH /missions/:id/assign ────────────────────────────────────────────────
 describe('PATCH /missions/:id/assign', () => {
+  const assignedMission = {
+    ...sampleMission,
+    status: 'assigned',
+    driverId: 'driver-abc',
+    pickupAddress: '10 Pickup St',
+    deliveryAddress: '20 Delivery Ave',
+  };
+
   it('assigns a driver to a pending mission', async () => {
-    // First query: check current status
     mockQuery.mockResolvedValueOnce({ rows: [{ status: 'pending' }] });
-    // Second query: UPDATE
-    mockQuery.mockResolvedValueOnce({
-      rows: [{ ...sampleMission, status: 'assigned', driverId: 'driver-abc' }],
-    });
+    mockQuery.mockResolvedValueOnce({ rows: [assignedMission] });
 
     const res = await withUser(request(app).patch('/missions/mission-uuid/assign')).send({
       driverId: 'driver-abc',
@@ -155,6 +173,40 @@ describe('PATCH /missions/:id/assign', () => {
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('assigned');
     expect(res.body.data.driverId).toBe('driver-abc');
+  });
+
+  it('fires mission:assigned notification to driver after assignment', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ status: 'pending' }] });
+    mockQuery.mockResolvedValueOnce({ rows: [assignedMission] });
+    mockAxiosGet.mockResolvedValueOnce({ data: { data: { userId: 'driver-user-uuid' } } });
+
+    await withUser(request(app).patch('/missions/mission-uuid/assign')).send({
+      driverId: 'driver-abc',
+    });
+
+    // Allow the fire-and-forget promise to settle
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(mockAxiosGet).toHaveBeenCalledWith(
+      expect.stringContaining('/drivers/driver-abc'),
+      expect.any(Object)
+    );
+    expect(mockAxiosPost).toHaveBeenCalledWith(
+      expect.stringContaining('/emit'),
+      expect.objectContaining({ event: 'mission:assigned', userId: 'driver-user-uuid' }),
+      expect.any(Object)
+    );
+  });
+
+  it('still returns 200 when notification service is down', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [{ status: 'pending' }] });
+    mockQuery.mockResolvedValueOnce({ rows: [assignedMission] });
+    mockAxiosGet.mockRejectedValueOnce(new Error('notification service down'));
+
+    const res = await withUser(request(app).patch('/missions/mission-uuid/assign')).send({
+      driverId: 'driver-abc',
+    });
+    expect(res.status).toBe(200);
   });
 
   it('returns 400 when driverId is missing', async () => {
@@ -185,9 +237,8 @@ describe('PATCH /missions/:id/assign', () => {
 describe('PATCH /missions/:id/status', () => {
   it('accepts assigned → in_progress transition', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ status: 'assigned', driver_id: 'driver-abc' }] })
+      .mockResolvedValueOnce({ rows: [{ status: 'assigned', driver_id: 'driver-abc', created_by: 'user-123' }] })
       .mockResolvedValueOnce({ rows: [{ ...sampleMission, status: 'in_progress' }] });
-    mockCreate.mockResolvedValueOnce({});
 
     const res = await withUser(request(app).patch('/missions/mission-uuid/status')).send({
       status: 'in_progress',
@@ -198,9 +249,8 @@ describe('PATCH /missions/:id/status', () => {
 
   it('accepts in_progress → completed transition', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ status: 'in_progress', driver_id: 'driver-abc' }] })
+      .mockResolvedValueOnce({ rows: [{ status: 'in_progress', driver_id: 'driver-abc', created_by: 'user-123' }] })
       .mockResolvedValueOnce({ rows: [{ ...sampleMission, status: 'completed' }] });
-    mockCreate.mockResolvedValueOnce({});
 
     const res = await withUser(request(app).patch('/missions/mission-uuid/status')).send({
       status: 'completed',
@@ -211,7 +261,7 @@ describe('PATCH /missions/:id/status', () => {
 
   it('accepts assigned → pending (driver refusal)', async () => {
     mockQuery
-      .mockResolvedValueOnce({ rows: [{ status: 'assigned', driver_id: 'driver-abc' }] })
+      .mockResolvedValueOnce({ rows: [{ status: 'assigned', driver_id: 'driver-abc', created_by: 'user-123' }] })
       .mockResolvedValueOnce({ rows: [{ ...sampleMission, status: 'pending', driverId: null }] });
 
     const res = await withUser(request(app).patch('/missions/mission-uuid/status')).send({
@@ -221,8 +271,38 @@ describe('PATCH /missions/:id/status', () => {
     expect(res.body.data.status).toBe('pending');
   });
 
+  it('notifies dispatcher (created_by) on status change', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ status: 'assigned', driver_id: 'driver-abc', created_by: 'dispatcher-xyz' }] })
+      .mockResolvedValueOnce({ rows: [{ ...sampleMission, status: 'in_progress' }] });
+
+    await withUser(request(app).patch('/missions/mission-uuid/status')).send({
+      status: 'in_progress',
+    });
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(mockAxiosPost).toHaveBeenCalledWith(
+      expect.stringContaining('/emit'),
+      expect.objectContaining({ event: 'mission:status', userId: 'dispatcher-xyz' }),
+      expect.any(Object)
+    );
+  });
+
+  it('still returns 200 when notification service is down', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ status: 'in_progress', driver_id: 'driver-abc', created_by: 'user-123' }] })
+      .mockResolvedValueOnce({ rows: [{ ...sampleMission, status: 'completed' }] });
+    mockAxiosPost.mockRejectedValueOnce(new Error('notification service down'));
+
+    const res = await withUser(request(app).patch('/missions/mission-uuid/status')).send({
+      status: 'completed',
+    });
+    expect(res.status).toBe(200);
+  });
+
   it('rejects pending → completed (invalid transition)', async () => {
-    mockQuery.mockResolvedValueOnce({ rows: [{ status: 'pending', driver_id: null }] });
+    mockQuery.mockResolvedValueOnce({ rows: [{ status: 'pending', driver_id: null, created_by: 'user-123' }] });
     const res = await withUser(request(app).patch('/missions/mission-uuid/status')).send({
       status: 'completed',
     });
@@ -242,6 +322,68 @@ describe('PATCH /missions/:id/status', () => {
     mockQuery.mockResolvedValueOnce({ rows: [] });
     const res = await withUser(request(app).patch('/missions/nope/status')).send({
       status: 'in_progress',
+    });
+    expect(res.status).toBe(404);
+  });
+});
+
+// ── PATCH /missions/:id/location ──────────────────────────────────────────────
+describe('PATCH /missions/:id/location', () => {
+  it('returns 200, writes DeliveryEvent, and emits driver:location', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ status: 'in_progress', created_by: 'dispatcher-xyz' }],
+    });
+
+    const res = await withUser(request(app).patch('/missions/mission-uuid/location')).send({
+      lat: 48.8566,
+      lng: 2.3522,
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toMatchObject({ missionId: 'mission-uuid', lat: 48.8566, lng: 2.3522 });
+
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(mockCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mission_id: 'mission-uuid',
+        status: 'in_progress',
+        location: { lat: 48.8566, lng: 2.3522 },
+      })
+    );
+    expect(mockAxiosPost).toHaveBeenCalledWith(
+      expect.stringContaining('/emit'),
+      expect.objectContaining({ event: 'driver:location', userId: 'dispatcher-xyz' }),
+      expect.any(Object)
+    );
+  });
+
+  it('returns 409 when mission is not in_progress', async () => {
+    mockQuery.mockResolvedValueOnce({
+      rows: [{ status: 'assigned', created_by: 'dispatcher-xyz' }],
+    });
+
+    const res = await withUser(request(app).patch('/missions/mission-uuid/location')).send({
+      lat: 48.8566,
+      lng: 2.3522,
+    });
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('INVALID_STATUS');
+  });
+
+  it('returns 400 when lat or lng is missing', async () => {
+    const res = await withUser(request(app).patch('/missions/mission-uuid/location')).send({
+      lat: 48.8566,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('MISSING_FIELDS');
+  });
+
+  it('returns 404 when mission not found', async () => {
+    mockQuery.mockResolvedValueOnce({ rows: [] });
+    const res = await withUser(request(app).patch('/missions/nope/location')).send({
+      lat: 48.8566,
+      lng: 2.3522,
     });
     expect(res.status).toBe(404);
   });

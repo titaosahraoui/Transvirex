@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 
 interface Mission {
   id: string;
@@ -39,7 +40,8 @@ const dispatchNav = [
 ];
 
 export default function BoardPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+  const socketRef = useSocket(token);
   const navigate = useNavigate();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -55,9 +57,17 @@ export default function BoardPage() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 10_000);
+    const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Real-time: refresh board immediately when a driver updates mission status
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.on('mission:status', load);
+    return () => { socket.off('mission:status', load); };
+  }, [socketRef.current, load]);
 
   const byStatus = (status: string) => missions.filter(m => m.status === status);
   const total = missions.length;
@@ -96,6 +106,15 @@ export default function BoardPage() {
         <div className="wf-appbar">
           <span className="bar-crumbs">Opérations / Missions du jour</span>
           <div className="bar-actions">
+            {/* Socket connection indicator */}
+            <span
+              title={socketRef.current?.connected ? 'Temps réel actif' : 'Hors ligne'}
+              style={{
+                width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+                background: socketRef.current?.connected ? 'var(--good)' : 'var(--ink-3)',
+                flexShrink: 0,
+              }}
+            />
             {/* Quick filter pills */}
             <span
               className={`wf-pill${filter === 'all' ? ' warn' : ''}`}
