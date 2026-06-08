@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
 
 interface Invoice {
@@ -15,20 +16,22 @@ const STATUS_PILL: Record<string, string> = {
 
 const billingNav = [
   'FACTURATION',
-  { key: 'inv',   icon: '🧾', label: 'Factures' },
-  { key: 'stats', icon: '📊', label: 'Statistiques' },
+  { key: 'inv',   icon: '🧾', label: 'Factures',     path: '/invoices' },
+  { key: 'stats', icon: '📊', label: 'Statistiques', path: '/stats' },
   'PARAMÈTRES',
   { key: 'set',   icon: '⚙',  label: 'Paramètres' },
 ];
 
 export default function InvoicesPage() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filter, setFilter]     = useState('all');
   const [loading, setLoading]   = useState(true);
   const [showNew, setShowNew]   = useState(false);
   const [newForm, setNewForm]   = useState({ missionId: '', clientName: '', amount: '' });
   const [creating, setCreating] = useState(false);
+  const [fetching, setFetching] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,6 +44,24 @@ export default function InvoicesPage() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (newForm.missionId.length < 8) return;
+    const t = setTimeout(async () => {
+      setFetching(true);
+      try {
+        const r = await api.get(`/missions/${newForm.missionId}`);
+        const m = r.data.data;
+        setNewForm(prev => ({
+          ...prev,
+          clientName: m.clientName,
+          amount: String(parseFloat(m.price) || ''),
+        }));
+      } catch { /* silent — user may still be typing */ }
+      finally { setFetching(false); }
+    }, 600);
+    return () => clearTimeout(t);
+  }, [newForm.missionId]);
 
   async function createInvoice() {
     setCreating(true);
@@ -77,7 +98,11 @@ export default function InvoicesPage() {
         {billingNav.map((item, i) => {
           if (typeof item === 'string') return <div key={i} className="side-group">{item}</div>;
           return (
-            <div key={item.key} className={`side-nav ${item.key === 'inv' ? 'on' : ''}`}>
+            <div
+              key={item.key}
+              className={`side-nav ${item.key === 'inv' ? 'on' : ''}`}
+              onClick={() => 'path' in item && item.path && navigate(item.path)}
+            >
               <span className="ic">{item.icon}</span> {item.label}
               {item.key === 'inv' && <span className="side-tag">{invoices.length}</span>}
             </div>
@@ -143,8 +168,20 @@ export default function InvoicesPage() {
                   <span className="script">Générer une facture</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label className="wf-field-label">ID Mission *</label>
+                      {fetching && <span className="mono muted" style={{ fontSize: 10 }}>Chargement…</span>}
+                    </div>
+                    <input
+                      type="text"
+                      value={newForm.missionId}
+                      onChange={e => setNewForm(p => ({ ...p, missionId: e.target.value }))}
+                      className="wf-inp box" style={{ width: '100%', marginTop: 4 }}
+                      placeholder="ID de la mission (8 caractères min.)"
+                    />
+                  </div>
                   {[
-                    { label: 'ID Mission',    field: 'missionId',  type: 'text'   },
                     { label: 'Nom client',    field: 'clientName', type: 'text'   },
                     { label: 'Montant (DZD)', field: 'amount',     type: 'number' },
                   ].map(({ label, field, type }) => (
@@ -184,7 +221,7 @@ export default function InvoicesPage() {
                 </thead>
                 <tbody>
                   {invoices.map(inv => (
-                    <tr key={inv.id}>
+                    <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/invoices/${inv.id}`)}>
                       <td><b>{inv.clientName}</b></td>
                       <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                         {inv.missionId.slice(0, 8)}…
@@ -200,7 +237,7 @@ export default function InvoicesPage() {
                       <td className="mono" style={{ fontSize: 11 }}>
                         {new Date(inv.generatedAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         {inv.status === 'draft' && (
                           <button className="wf-btn sm warn" onClick={() => markStatus(inv.id, 'sent')}>
                             Envoyer

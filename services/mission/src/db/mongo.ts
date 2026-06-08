@@ -2,24 +2,26 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 // ── DeliveryEvent document ────────────────────────────────────────────────────
 export interface IDeliveryEvent extends Document {
-  mission_id: string;
-  driver_id: string;
-  status: string;
-  location: { lat: number; lng: number };
-  notes?: string;
-  timestamp: Date;
+  mission_id:  string;
+  driver_id:   string;
+  status:      string;
+  location:    { lat: number; lng: number };
+  notes?:      string;
+  podPhotoUrl?: string;
+  timestamp:   Date;
 }
 
 const DeliveryEventSchema = new Schema<IDeliveryEvent>({
-  mission_id: { type: String, required: true, index: true },
-  driver_id:  { type: String, required: true },
-  status:     { type: String, required: true },
+  mission_id:  { type: String, required: true, index: true },
+  driver_id:   { type: String, required: true },
+  status:      { type: String, required: true },
   location: {
     lat: { type: Number, default: 0 },
     lng: { type: Number, default: 0 },
   },
-  notes:     { type: String },
-  timestamp: { type: Date, default: Date.now },
+  notes:       { type: String },
+  podPhotoUrl: { type: String },
+  timestamp:   { type: Date, default: Date.now },
 });
 
 export const DeliveryEvent = mongoose.model<IDeliveryEvent>(

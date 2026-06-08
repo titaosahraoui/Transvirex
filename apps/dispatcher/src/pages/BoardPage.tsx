@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
+import { dispatchNav } from '../lib/dispatchNav';
 
 interface Mission {
   id: string;
@@ -11,7 +13,16 @@ interface Mission {
   status: string;
   driverId: string | null;
   createdAt: string;
+  price: string;
+  missionType: string;
+  priority: string;
 }
+
+const PRIORITY_PILL: Record<string, { label: string; cls: string }> = {
+  low:    { label: 'Faible',  cls: '' },
+  high:   { label: 'Haute',   cls: 'warn' },
+  urgent: { label: 'Urgente', cls: 'bad' },
+};
 
 const COLUMNS = [
   { key: 'pending',     label: 'À assigner',    accent: 'var(--ink-3)' },
@@ -19,6 +30,7 @@ const COLUMNS = [
   { key: 'in_progress',label: 'En route',        accent: 'var(--accent)' },
   { key: 'completed',  label: 'Livrées',         accent: 'var(--good)' },
   { key: 'failed',     label: 'Échecs',          accent: 'var(--bad)' },
+  { key: 'cancelled',  label: 'Annulées',        accent: 'var(--bad)' },
 ];
 
 const STATUS_PILL: Record<string, string> = {
@@ -27,19 +39,12 @@ const STATUS_PILL: Record<string, string> = {
   in_progress: 'warn',
   completed:   'good',
   failed:      'bad',
+  cancelled:   'bad',
 };
 
-const dispatchNav = [
-  'OPÉRATIONS',
-  { key: 'miss', icon: '📋', label: 'Missions', path: '/board' },
-  { key: 'new',  icon: '＋', label: 'Nouvelle mission', path: '/missions/new' },
-  'ÉQUIPE',
-  { key: 'drv',  icon: '🚐', label: 'Chauffeurs' },
-  { key: 'alert',icon: '⚠',  label: 'Alertes' },
-];
-
 export default function BoardPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+  const socketRef = useSocket(token);
   const navigate = useNavigate();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -47,17 +52,25 @@ export default function BoardPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await api.get('/missions');
-      setMissions(r.data.data);
+      const r = await api.get('/missions?limit=100');
+      setMissions(r.data.data.items);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 10_000);
+    const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Real-time: refresh board immediately when a driver updates mission status
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    socket.on('mission:status', load);
+    return () => { socket.off('mission:status', load); };
+  }, [socketRef.current, load]);
 
   const byStatus = (status: string) => missions.filter(m => m.status === status);
   const total = missions.length;
@@ -75,8 +88,8 @@ export default function BoardPage() {
           return (
             <div
               key={item.key}
-              className={`side-nav ${'path' in item && item.path === '/board' ? 'on' : ''}`}
-              onClick={() => 'path' in item && item.path && navigate(item.path)}
+              className={`side-nav ${item.key === 'miss' ? 'on' : ''}`}
+              onClick={() => item.path && navigate(item.path)}
             >
               <span className="ic">{item.icon}</span>
               {item.label}
@@ -96,6 +109,15 @@ export default function BoardPage() {
         <div className="wf-appbar">
           <span className="bar-crumbs">Opérations / Missions du jour</span>
           <div className="bar-actions">
+            {/* Socket connection indicator */}
+            <span
+              title={socketRef.current?.connected ? 'Temps réel actif' : 'Hors ligne'}
+              style={{
+                width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+                background: socketRef.current?.connected ? 'var(--good)' : 'var(--ink-3)',
+                flexShrink: 0,
+              }}
+            />
             {/* Quick filter pills */}
             <span
               className={`wf-pill${filter === 'all' ? ' warn' : ''}`}
@@ -174,6 +196,18 @@ export default function BoardPage() {
                             ⏱ {new Date(m.deadline).toLocaleString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         )}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                          {m.price && parseFloat(m.price) > 0 && (
+                            <span className="mono" style={{ fontSize: 9, color: 'var(--good)', fontWeight: 700 }}>
+                              {parseFloat(m.price).toLocaleString('fr-FR')} DZD
+                            </span>
+                          )}
+                          {m.priority && PRIORITY_PILL[m.priority] && (
+                            <span className={`wf-pill ${PRIORITY_PILL[m.priority].cls}`} style={{ fontSize: 9 }}>
+                              {PRIORITY_PILL[m.priority].label}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     ))}
                     {cards.length === 0 && (

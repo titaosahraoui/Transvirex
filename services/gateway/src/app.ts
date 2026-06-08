@@ -70,6 +70,9 @@ app.use('/billing',  jwtGuard, proxyTo(BILLING_URL, 'billing'));
 // AI service handles: /ai/*
 app.use('/ai',       jwtGuard, proxyTo(AI_URL,      'ai'));
 
+// Mission service static uploads (POD photos): /mission-uploads/*
+app.use('/mission-uploads', jwtGuard, proxyTo(MISSION_URL, 'uploads'));
+
 // ── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => {
   res.status(404).json(createError('NOT_FOUND', 'Route not found on gateway'));

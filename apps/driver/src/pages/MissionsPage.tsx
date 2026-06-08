@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
+import { useSocket } from '../hooks/useSocket';
 
 interface Mission {
   id: string; clientName: string; pickupAddress: string;
@@ -9,18 +10,20 @@ interface Mission {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  assigned: 'Assignée', in_progress: 'En route', completed: 'Livrée', failed: 'Échec',
+  assigned: 'Assignée', in_progress: 'En route', completed: 'Livrée', failed: 'Échec', cancelled: 'Annulée',
 };
 const STATUS_PILL: Record<string, string> = {
-  assigned: 'warn', in_progress: 'warn', completed: 'good', failed: 'bad',
+  assigned: 'warn', in_progress: 'warn', completed: 'good', failed: 'bad', cancelled: 'bad',
 };
 
 export default function MissionsPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
   const navigate = useNavigate();
-  const [missions, setMissions] = useState<Mission[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [filter, setFilter]     = useState('all');
+  const socketRef = useSocket(token);
+  const [missions, setMissions]     = useState<Mission[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [filter, setFilter]         = useState('all');
+  const [notification, setNotification] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -31,18 +34,43 @@ export default function MissionsPage() {
         ? `/missions?driverId=${driverId}`
         : `/missions?driverId=${driverId}&status=${filter}`;
       const r = await api.get(url);
-      setMissions(r.data.data);
+      setMissions(r.data.data.items);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   }, [user, filter]);
 
   useEffect(() => { load(); }, [load]);
 
+  // Real-time: receive assignment notification from dispatcher
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket) return;
+    const assignHandler = (data: { clientName?: string }) => {
+      load();
+      setNotification(`Nouvelle mission : ${data.clientName ?? 'nouvelle course'}`);
+      setTimeout(() => setNotification(null), 4000);
+    };
+    const statusHandler = (data: { status?: string }) => {
+      if (data.status === 'cancelled') {
+        load();
+        setNotification('Une mission a été annulée');
+        setTimeout(() => setNotification(null), 4000);
+      }
+    };
+    socket.on('mission:assigned', assignHandler);
+    socket.on('mission:status', statusHandler);
+    return () => {
+      socket.off('mission:assigned', assignHandler);
+      socket.off('mission:status', statusHandler);
+    };
+  }, [socketRef.current, load]);
+
   const filters = [
     { key: 'all',         label: 'Toutes' },
     { key: 'assigned',    label: 'Assignées' },
     { key: 'in_progress', label: 'En route' },
     { key: 'completed',   label: 'Livrées' },
+    { key: 'cancelled',   label: 'Annulées' },
   ];
 
   return (
@@ -57,6 +85,15 @@ export default function MissionsPage() {
           ↩ Déco
         </span>
       </div>
+
+      {/* Assignment toast notification */}
+      {notification && (
+        <div style={{ position: 'fixed', top: 64, left: 0, right: 0, maxWidth: 430, margin: '0 auto', zIndex: 40, padding: '0 12px' }}>
+          <div className="wf-box tint" style={{ borderColor: 'var(--accent)', textAlign: 'center', fontSize: 13, fontWeight: 700 }}>
+            🚨 {notification}
+          </div>
+        </div>
+      )}
 
       {/* Title */}
       <div style={{ padding: '16px 16px 8px' }}>
