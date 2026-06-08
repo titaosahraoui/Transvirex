@@ -20,22 +20,22 @@ interface FeedEvent {
   receivedAt: Date;
 }
 
+interface MissionStats {
+  failedCount: number;
+  overdueCount: number;
+  slaPercent: number;
+  completedCount: number;
+  pendingCount: number;
+  inProgressCount: number;
+}
+
 const STATUS_ICON: Record<string, string> = {
   failed:      '📥',
   completed:   '✓',
   in_progress: '⚠',
   cancelled:   '✕',
+  rejected:    '✕',
 };
-
-function slaPercent(missions: Mission[]): number {
-  const done = missions.filter(m => m.status === 'completed' || m.status === 'failed');
-  if (done.length === 0) return 100;
-  const onTime = done.filter(m => {
-    if (m.status !== 'completed' || !m.deadline) return false;
-    return true;
-  }).length;
-  return Math.round((onTime / done.length) * 100);
-}
 
 export default function AlertsPage() {
   const { user, logout, token } = useAuth();
@@ -44,24 +44,28 @@ export default function AlertsPage() {
   const [incidents, setIncidents] = useState<Mission[]>([]);
   const [overdue, setOverdue]     = useState<Mission[]>([]);
   const [feed, setFeed]           = useState<FeedEvent[]>([]);
-  const [allMissions, setAllMissions] = useState<Mission[]>([]);
+  const [stats, setStats]         = useState<MissionStats | null>(null);
   const [loading, setLoading]     = useState(true);
 
   useEffect(() => {
     const now = new Date();
-    Promise.all([
+    const loadAll = () => Promise.all([
       api.get('/missions?status=failed&limit=50'),
       api.get('/missions?status=in_progress&limit=100'),
-      api.get('/missions?limit=200'),
+      api.get('/missions/stats'),
     ])
-      .then(([failRes, inpRes, allRes]) => {
+      .then(([failRes, inpRes, statsRes]) => {
         setIncidents(failRes.data.data.items ?? []);
         const inpItems: Mission[] = inpRes.data.data.items ?? [];
         setOverdue(inpItems.filter(m => m.deadline && new Date(m.deadline) < now));
-        setAllMissions(allRes.data.data.items ?? []);
+        setStats(statsRes.data.data);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+
+    loadAll();
+    const t = setInterval(loadAll, 30_000);
+    return () => clearInterval(t);
   }, []);
 
   // Live feed via socket
@@ -79,7 +83,7 @@ export default function AlertsPage() {
     return () => { socket.off('mission:status', handler); };
   }, [socketRef.current]);
 
-  const sla = slaPercent(allMissions);
+  const sla = stats?.slaPercent ?? 100;
 
   function delayLabel(deadline: string): string {
     const diff = Math.round((Date.now() - new Date(deadline).getTime()) / 60000);
@@ -137,9 +141,9 @@ export default function AlertsPage() {
               {/* KPI row */}
               <div style={{ display: 'flex', gap: 12 }}>
                 {[
-                  { label: 'Incidents',  value: incidents.length, color: 'var(--bad)' },
-                  { label: 'Retards',    value: overdue.length,   color: 'var(--hi)' },
-                  { label: 'SLA',        value: `${sla}%`,        color: sla >= 80 ? 'var(--good)' : sla >= 60 ? 'var(--hi)' : 'var(--bad)' },
+                  { label: 'Incidents',  value: stats?.failedCount ?? incidents.length, color: 'var(--bad)' },
+                  { label: 'Retards',    value: stats?.overdueCount ?? overdue.length,  color: 'var(--hi)' },
+                  { label: 'SLA',        value: `${sla}%`,                              color: sla >= 80 ? 'var(--good)' : sla >= 60 ? 'var(--hi)' : 'var(--bad)' },
                 ].map(k => (
                   <div key={k.label} className="wf-box" style={{ flex: 1, textAlign: 'center', padding: '14px 8px' }}>
                     <div style={{ fontSize: 28, fontWeight: 700, color: k.color, fontFamily: 'var(--font-script)' }}>{k.value}</div>

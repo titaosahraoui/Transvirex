@@ -22,13 +22,14 @@ const STATUS_PILL: Record<string, string> = {
 const NEXT_ACTIONS: Record<string, { label: string; status: string; variant: string }[]> = {
   assigned: [
     { label: '✅ Accepter la mission', status: 'in_progress', variant: 'good' },
-    { label: '✕ Refuser',             status: 'pending',     variant: 'bad'  },
   ],
   in_progress: [
     { label: '✅ Marquer comme livrée', status: 'completed', variant: 'good' },
     { label: '⚠ Signaler un incident', status: 'failed',    variant: 'warn' },
   ],
 };
+
+const REJECT_REASONS = ['Trop chargé', 'Véhicule en panne', 'Zone inaccessible', 'Autre'];
 
 // Emoji div-icons avoid Vite's default-marker image bundling issue
 const pickupIcon = L.divIcon({ className: '', html: '📍', iconSize: [28, 28], iconAnchor: [14, 28] });
@@ -46,10 +47,13 @@ export default function MissionDetailPage() {
   const { token } = useAuth();
   const socketRef = useSocket(token);
   const watchIdRef = useRef<number | null>(null);
-  const [mission, setMission]   = useState<Mission | null>(null);
-  const [loading, setLoading]   = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [mission, setMission]     = useState<Mission | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [updating, setUpdating]   = useState(false);
   const [gpsActive, setGpsActive] = useState(false);
+  const [showReject, setShowReject]   = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting]     = useState(false);
 
   useEffect(() => {
     api.get(`/missions/${id}`)
@@ -105,14 +109,21 @@ export default function MissionDetailPage() {
     setUpdating(true);
     try {
       await api.patch(`/missions/${mission.id}/status`, { status });
-      if (status === 'pending') {
-        navigate('/missions');
-      } else {
-        setMission(prev => prev ? { ...prev, status } : prev);
-      }
+      setMission(prev => prev ? { ...prev, status } : prev);
     } catch (err) {
       console.error(err);
     } finally { setUpdating(false); }
+  }
+
+  async function handleReject() {
+    if (!mission || !rejectReason) return;
+    setRejecting(true);
+    try {
+      await api.patch(`/missions/${mission.id}/reject`, { reason: rejectReason });
+      navigate('/missions');
+    } catch (err) {
+      console.error(err);
+    } finally { setRejecting(false); }
   }
 
   if (loading) return (
@@ -245,6 +256,48 @@ export default function MissionDetailPage() {
             {updating ? 'Mise à jour…' : action.label}
           </button>
         ))}
+
+        {/* Reject flow (assigned only) */}
+        {mission.status === 'assigned' && (
+          !showReject ? (
+            <button
+              className="wf-btn bad"
+              style={{ width: '100%', padding: '12px 0', fontSize: 14 }}
+              onClick={() => setShowReject(true)}
+            >
+              ✕ Refuser la mission
+            </button>
+          ) : (
+            <div className="wf-box solid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13 }}>Motif de refus</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {REJECT_REASONS.map(r => (
+                  <span
+                    key={r}
+                    className={`wf-pill${rejectReason === r ? ' fill' : ''}`}
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setRejectReason(r)}
+                  >
+                    {r}
+                  </span>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="wf-btn" style={{ flex: 1 }} onClick={() => { setShowReject(false); setRejectReason(''); }}>
+                  Annuler
+                </button>
+                <button
+                  className="wf-btn bad"
+                  style={{ flex: 1 }}
+                  disabled={!rejectReason || rejecting}
+                  onClick={handleReject}
+                >
+                  {rejecting ? 'Refus…' : 'Confirmer'}
+                </button>
+              </div>
+            </div>
+          )
+        )}
 
         {mission.status === 'completed' && (
           <div className="wf-box" style={{ background: '#e3f4dc', borderStyle: 'solid', borderColor: 'var(--good)', textAlign: 'center' }}>

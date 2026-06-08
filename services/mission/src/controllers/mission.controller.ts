@@ -8,11 +8,20 @@ import { notifyUser } from '../utils/notify';
 
 const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:4001';
 
+const ORDER_MAP: Record<string, string> = {
+  created_asc:   'created_at ASC',
+  created_desc:  'created_at DESC',
+  deadline_asc:  'deadline ASC NULLS LAST',
+  deadline_desc: 'deadline DESC NULLS LAST',
+  priority_desc: "CASE priority WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END ASC",
+  price_desc:    'price DESC',
+};
+
 // ── GET /missions ─────────────────────────────────────────────────────────────
-// Supports: ?status=X &driverId=Y &from=ISO &to=ISO &page=1 &limit=20
+// Supports: ?status=X &driverId=Y &from=ISO &to=ISO &search=X &priority=X &missionType=X &sort=X &page=1 &limit=20
 export async function getMissions(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
-    const { status, driverId, from, to, page: pageStr, limit: limitStr } =
+    const { status, driverId, from, to, search, priority, missionType, sort, page: pageStr, limit: limitStr } =
       req.query as Record<string, string | undefined>;
 
     const page  = Math.max(1, parseInt(pageStr  ?? '1',  10) || 1);
@@ -23,12 +32,16 @@ export async function getMissions(req: AuthenticatedRequest, res: Response): Pro
     const values: unknown[] = [];
     let idx = 1;
 
-    if (status)   { conditions.push(`status = $${idx++}`);     values.push(status); }
-    if (driverId) { conditions.push(`driver_id = $${idx++}`);  values.push(driverId); }
-    if (from)     { conditions.push(`created_at >= $${idx++}`); values.push(from); }
-    if (to)       { conditions.push(`created_at <= $${idx++}`); values.push(to); }
+    if (status)      { conditions.push(`status = $${idx++}`);                  values.push(status); }
+    if (driverId)    { conditions.push(`driver_id = $${idx++}`);               values.push(driverId); }
+    if (from)        { conditions.push(`created_at >= $${idx++}`);             values.push(from); }
+    if (to)          { conditions.push(`created_at <= $${idx++}`);             values.push(to); }
+    if (search)      { conditions.push(`client_name ILIKE $${idx++}`);         values.push(`%${search}%`); }
+    if (priority)    { conditions.push(`priority = $${idx++}`);                values.push(priority); }
+    if (missionType) { conditions.push(`mission_type = $${idx++}`);            values.push(missionType); }
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const where   = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const orderBy = ORDER_MAP[sort ?? ''] ?? 'created_at DESC';
 
     const [countResult, dataResult] = await Promise.all([
       pool.query(`SELECT COUNT(*) FROM missions ${where}`, values),
@@ -41,9 +54,10 @@ export async function getMissions(req: AuthenticatedRequest, res: Response): Pro
                 deadline, status, driver_id AS "driverId",
                 created_by AS "createdBy", created_at AS "createdAt",
                 price, mission_type AS "missionType", weight_kg AS "weightKg",
-                notes, priority
+                notes, priority,
+                completed_at AS "completedAt", rejected_reason AS "rejectedReason"
          FROM missions ${where}
-         ORDER BY created_at DESC
+         ORDER BY ${orderBy}
          LIMIT $${idx} OFFSET $${idx + 1}`,
         [...values, limit, offset]
       ),
@@ -77,7 +91,8 @@ export async function getMissionById(req: AuthenticatedRequest, res: Response): 
               deadline, status, driver_id AS "driverId",
               created_by AS "createdBy", created_at AS "createdAt",
               price, mission_type AS "missionType", weight_kg AS "weightKg",
-              notes, priority
+              notes, priority,
+              completed_at AS "completedAt", rejected_reason AS "rejectedReason"
        FROM missions WHERE id = $1`,
       [id]
     );
@@ -296,13 +311,15 @@ export async function updateMissionStatus(
     }
 
     const newDriverId = status === 'pending' ? null : currentDriverId;
+    const completedAtClause = status === 'completed' ? ', completed_at = NOW()' : '';
 
     const result = await pool.query(
-      `UPDATE missions SET status = $1, driver_id = $2 WHERE id = $3
+      `UPDATE missions SET status = $1, driver_id = $2${completedAtClause} WHERE id = $3
        RETURNING id, client_name AS "clientName",
                  pickup_address AS "pickupAddress", delivery_address AS "deliveryAddress",
                  deadline, status, driver_id AS "driverId",
-                 created_by AS "createdBy", created_at AS "createdAt"`,
+                 created_by AS "createdBy", created_at AS "createdAt",
+                 completed_at AS "completedAt"`,
       [status, newDriverId, id]
     );
 
@@ -513,5 +530,128 @@ export async function reassignMission(req: AuthenticatedRequest, res: Response):
   } catch (err) {
     console.error('[mission] reassignMission error:', err);
     res.status(500).json(createError('INTERNAL_ERROR', 'Failed to reassign mission'));
+  }
+}
+
+// ── GET /missions/stats ───────────────────────────────────────────────────────
+export async function getMissionStats(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE status = 'pending')     AS "pendingCount",
+        COUNT(*) FILTER (WHERE status = 'assigned')    AS "assignedCount",
+        COUNT(*) FILTER (WHERE status = 'in_progress') AS "inProgressCount",
+        COUNT(*) FILTER (WHERE status = 'completed')   AS "completedCount",
+        COUNT(*) FILTER (WHERE status = 'failed')      AS "failedCount",
+        COUNT(*) FILTER (WHERE status = 'cancelled')   AS "cancelledCount",
+        COALESCE(SUM(price) FILTER (WHERE status = 'completed'), 0) AS "totalRevenue",
+        COUNT(*) FILTER (
+          WHERE status IN ('assigned','in_progress') AND deadline IS NOT NULL AND deadline < NOW()
+        ) AS "overdueCount",
+        COUNT(*) FILTER (WHERE status = 'completed' AND deadline IS NOT NULL)                         AS "completedWithDeadline",
+        COUNT(*) FILTER (WHERE status = 'completed' AND deadline IS NOT NULL AND completed_at <= deadline) AS "completedOnTime"
+      FROM missions
+    `);
+
+    const row = result.rows[0];
+    const completedWithDeadline = parseInt(row.completedWithDeadline, 10);
+    const completedOnTime       = parseInt(row.completedOnTime, 10);
+    const slaPercent = completedWithDeadline > 0
+      ? Math.round((completedOnTime / completedWithDeadline) * 100)
+      : 100;
+
+    res.json(createSuccess({
+      pendingCount:     parseInt(row.pendingCount, 10),
+      assignedCount:    parseInt(row.assignedCount, 10),
+      inProgressCount:  parseInt(row.inProgressCount, 10),
+      completedCount:   parseInt(row.completedCount, 10),
+      failedCount:      parseInt(row.failedCount, 10),
+      cancelledCount:   parseInt(row.cancelledCount, 10),
+      totalRevenue:     row.totalRevenue,
+      overdueCount:     parseInt(row.overdueCount, 10),
+      slaPercent,
+    }));
+  } catch (err) {
+    console.error('[mission] getMissionStats error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to fetch mission stats'));
+  }
+}
+
+// ── PATCH /missions/:id/reject ────────────────────────────────────────────────
+// Driver rejects an assigned mission with a reason. Mission returns to pending.
+export async function rejectMission(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const { reason = 'Aucune raison fournie' } = req.body;
+
+    const current = await pool.query(
+      'SELECT status, driver_id, created_by FROM missions WHERE id = $1', [id]
+    );
+    if (current.rows.length === 0) {
+      res.status(404).json(createError('NOT_FOUND', 'Mission not found'));
+      return;
+    }
+    if (current.rows[0].status !== 'assigned') {
+      res.status(409).json(
+        createError('INVALID_TRANSITION', `Cannot reject a mission with status '${current.rows[0].status}'`)
+      );
+      return;
+    }
+
+    const { driver_id: driverId, created_by: createdBy } = current.rows[0];
+
+    const result = await pool.query(
+      `UPDATE missions SET status = 'pending', driver_id = NULL, rejected_reason = $1 WHERE id = $2
+       RETURNING id, client_name AS "clientName", status,
+                 driver_id AS "driverId", rejected_reason AS "rejectedReason"`,
+      [reason, id]
+    );
+
+    res.json(createSuccess(result.rows[0]));
+
+    Promise.resolve().then(async () => {
+      try {
+        await DeliveryEvent.create({
+          mission_id: id, driver_id: driverId,
+          status: 'rejected', notes: reason, timestamp: new Date(),
+          location: { lat: 0, lng: 0 },
+        });
+        await notifyUser('mission:status', createdBy, { missionId: id, status: 'rejected', reason });
+      } catch (err) {
+        console.error('[mission] rejectMission notify failed:', err);
+      }
+    });
+  } catch (err) {
+    console.error('[mission] rejectMission error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to reject mission'));
+  }
+}
+
+// ── GET /missions/:id/location-history ────────────────────────────────────────
+// Returns ordered GPS pings from MongoDB for an in_progress mission.
+export async function getMissionLocationHistory(
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> {
+  try {
+    const { id } = req.params;
+    const events = await DeliveryEvent.find({
+      mission_id: id,
+      $or: [{ 'location.lat': { $ne: 0 } }, { 'location.lng': { $ne: 0 } }],
+    })
+      .sort({ timestamp: 1 })
+      .select('location.lat location.lng timestamp driver_id -_id');
+
+    const history = events.map((e: any) => ({
+      lat:      e.location.lat,
+      lng:      e.location.lng,
+      timestamp: e.timestamp,
+      driverId:  e.driver_id,
+    }));
+
+    res.json(createSuccess(history));
+  } catch (err) {
+    console.error('[mission] getMissionLocationHistory error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to fetch location history'));
   }
 }

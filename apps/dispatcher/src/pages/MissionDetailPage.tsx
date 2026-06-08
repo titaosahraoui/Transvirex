@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { api, useAuth } from '../context/AuthContext';
 import { useSocket } from '../hooks/useSocket';
 import { dispatchNav } from '../lib/dispatchNav';
+import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
+import L from 'leaflet';
 
 interface Mission {
   id: string; clientName: string;
@@ -44,8 +46,12 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 const EVENT_ICON: Record<string, string> = {
-  completed: '✓', failed: '⚠', in_progress: '●', cancelled: '✕',
+  completed: '✓', failed: '⚠', in_progress: '●', cancelled: '✕', rejected: '✕',
 };
+
+const pickupIcon  = L.divIcon({ className: '', html: '📍', iconSize: [28, 28], iconAnchor: [14, 28] });
+const deliveryIcon = L.divIcon({ className: '', html: '🏁', iconSize: [28, 28], iconAnchor: [14, 28] });
+const driverIcon  = L.divIcon({ className: '', html: '🚐', iconSize: [28, 28], iconAnchor: [14, 28] });
 
 export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +65,7 @@ export default function MissionDetailPage() {
   const [driverDetail, setDriverDetail] = useState<DriverDetail | null>(null);
   const [events, setEvents]             = useState<DeliveryEvent[]>([]);
   const [lastLocation, setLastLocation] = useState<{ lat: number; lng: number; age: number } | null>(null);
+  const [locationHistory, setLocationHistory] = useState<{ lat: number; lng: number }[]>([]);
 
   // Edit state
   const [editing, setEditing]     = useState(false);
@@ -78,6 +85,11 @@ export default function MissionDetailPage() {
       const m = r.data.data;
       setMission(m);
       setEditForm(m);
+      if (['assigned', 'in_progress', 'completed'].includes(m.status)) {
+        api.get(`/missions/${id}/location-history`)
+          .then(lhr => setLocationHistory(lhr.data.data ?? []))
+          .catch(() => {});
+      }
     }).catch(console.error);
     api.get('/drivers?status=available').then(r => setDrivers(r.data.data ?? [])).catch(console.error);
     api.get(`/missions/${id}/events`).then(r => setEvents(r.data.data ?? [])).catch(console.error);
@@ -98,6 +110,7 @@ export default function MissionDetailPage() {
     const handler = (data: { missionId: string; lat: number; lng: number }) => {
       if (data.missionId !== id) return;
       setLastLocation({ lat: data.lat, lng: data.lng, age: 0 });
+      setLocationHistory(prev => [...prev, { lat: data.lat, lng: data.lng }]);
     };
     socket.on('driver:location', handler);
     return () => { socket.off('driver:location', handler); };
@@ -591,6 +604,43 @@ export default function MissionDetailPage() {
                   ) : (
                     <div className="mono muted" style={{ fontSize: 10, marginTop: 6 }}>En attente de la position GPS…</div>
                   )}
+                </div>
+              )}
+
+              {/* Live tracking map (assigned or in_progress) */}
+              {['assigned', 'in_progress'].includes(mission.status) && (
+                <div style={{ height: 280, borderRadius: 8, overflow: 'hidden', border: '1.5px dashed var(--ink)' }}>
+                  <MapContainer
+                    center={
+                      lastLocation
+                        ? [lastLocation.lat, lastLocation.lng]
+                        : (mission.pickupLat !== 0
+                            ? [+mission.pickupLat, +mission.pickupLng]
+                            : [36.7538, 3.0588])
+                    }
+                    zoom={12}
+                    style={{ height: '100%', width: '100%' }}
+                  >
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap" />
+                    {mission.pickupLat !== 0 && (
+                      <Marker position={[+mission.pickupLat, +mission.pickupLng]} icon={pickupIcon}>
+                        <Popup>📍 {mission.pickupAddress}</Popup>
+                      </Marker>
+                    )}
+                    {mission.deliveryLat !== 0 && (
+                      <Marker position={[+mission.deliveryLat, +mission.deliveryLng]} icon={deliveryIcon}>
+                        <Popup>🏁 {mission.deliveryAddress}</Popup>
+                      </Marker>
+                    )}
+                    {locationHistory.length > 1 && (
+                      <Polyline positions={locationHistory.map(p => [p.lat, p.lng] as [number, number])} color="#f59e0b" weight={3} />
+                    )}
+                    {lastLocation && (
+                      <Marker position={[lastLocation.lat, lastLocation.lng]} icon={driverIcon}>
+                        <Popup>🚐 {driverDetail?.name ?? 'Chauffeur'} — il y a {lastLocation.age}s</Popup>
+                      </Marker>
+                    )}
+                  </MapContainer>
                 </div>
               )}
 

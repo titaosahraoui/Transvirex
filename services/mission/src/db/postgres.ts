@@ -54,4 +54,14 @@ export async function initSchema(): Promise<void> {
     EXCEPTION WHEN OTHERS THEN NULL;
     END $$;
   `);
+
+  // Idempotent migration: add SLA tracking and rejection audit columns.
+  await pool.query(`
+    DO $$
+    BEGIN
+      ALTER TABLE missions ADD COLUMN IF NOT EXISTS completed_at    TIMESTAMPTZ;
+      ALTER TABLE missions ADD COLUMN IF NOT EXISTS rejected_reason TEXT;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END $$;
+  `);
 }

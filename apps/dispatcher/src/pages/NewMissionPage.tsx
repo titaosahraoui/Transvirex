@@ -2,6 +2,16 @@ import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../context/AuthContext';
 import { dispatchNav } from '../lib/dispatchNav';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+
+const pickupIcon  = L.divIcon({ className: '', html: '📍', iconSize: [28, 28], iconAnchor: [14, 28] });
+const deliveryIcon = L.divIcon({ className: '', html: '🏁', iconSize: [28, 28], iconAnchor: [14, 28] });
+
+function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+  useMapEvents({ click: e => onMapClick(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
 
 const MISSION_TYPES = [
   { value: 'standard', label: 'Standard' },
@@ -21,12 +31,45 @@ export default function NewMissionPage() {
   const [form, setForm] = useState({
     clientName: '', pickupAddress: '', deliveryAddress: '', deadline: '',
     price: '', missionType: 'standard', weightKg: '', notes: '', priority: 'medium',
+    pickupLat: 0, pickupLng: 0, deliveryLat: 0, deliveryLng: 0,
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [activePoint, setActivePoint] = useState<'pickup' | 'delivery'>('pickup');
+  const [geocoding, setGeocoding] = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
 
   function set(field: string, value: string) {
     setForm(prev => ({ ...prev, [field]: value }));
+  }
+
+  async function reverseGeocode(lat: number, lng: number): Promise<string> {
+    try {
+      const r = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { 'Accept-Language': 'fr' } }
+      );
+      const data = await r.json();
+      return data.display_name ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    } catch {
+      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+  }
+
+  async function handleMapClick(lat: number, lng: number) {
+    setGeocoding(true);
+    const address = await reverseGeocode(lat, lng);
+    setGeocoding(false);
+    if (activePoint === 'pickup') {
+      setForm(prev => ({ ...prev, pickupLat: lat, pickupLng: lng, pickupAddress: address }));
+      setActivePoint('delivery');
+    } else {
+      setForm(prev => ({ ...prev, deliveryLat: lat, deliveryLng: lng, deliveryAddress: address }));
+    }
+  }
+
+  function resetMap() {
+    setActivePoint('pickup');
+    setForm(prev => ({ ...prev, pickupLat: 0, pickupLng: 0, deliveryLat: 0, deliveryLng: 0, pickupAddress: '', deliveryAddress: '' }));
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -36,12 +79,16 @@ export default function NewMissionPage() {
       const r = await api.post('/missions', {
         clientName:      form.clientName,
         pickupAddress:   form.pickupAddress,
+        pickupLat:       form.pickupLat   || undefined,
+        pickupLng:       form.pickupLng   || undefined,
         deliveryAddress: form.deliveryAddress,
-        deadline:        form.deadline || undefined,
+        deliveryLat:     form.deliveryLat  || undefined,
+        deliveryLng:     form.deliveryLng  || undefined,
+        deadline:        form.deadline     || undefined,
         price:           parseFloat(form.price) || 0,
         missionType:     form.missionType,
         weightKg:        parseFloat(form.weightKg) || 0,
-        notes:           form.notes || undefined,
+        notes:           form.notes        || undefined,
         priority:        form.priority,
       });
       navigate(`/missions/${r.data.data.id}`);
@@ -103,13 +150,68 @@ export default function NewMissionPage() {
                     className="wf-inp" style={{ marginTop: 4, width: '100%' }}
                   />
                 </div>
+
+                {/* ── Map picker ── */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
+                    <span
+                      className={`wf-pill${activePoint === 'pickup' ? ' fill' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setActivePoint('pickup')}
+                    >
+                      📍 Enlèvement {form.pickupLat !== 0 ? '✓' : ''}
+                    </span>
+                    <span
+                      className={`wf-pill${activePoint === 'delivery' ? ' fill' : ''}`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setActivePoint('delivery')}
+                    >
+                      🏁 Livraison {form.deliveryLat !== 0 ? '✓' : ''}
+                    </span>
+                    <span className="mono muted" style={{ fontSize: 10 }}>
+                      {activePoint === 'pickup' ? '— cliquez pour placer l\'enlèvement' : '— cliquez pour placer la livraison'}
+                    </span>
+                    {(form.pickupLat !== 0 || form.deliveryLat !== 0) && (
+                      <button type="button" className="wf-btn sm" style={{ marginLeft: 'auto' }} onClick={resetMap}>
+                        ↺ Effacer
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ height: 300, borderRadius: 8, overflow: 'hidden', border: '1.5px dashed var(--ink)', cursor: 'crosshair' }}>
+                    <MapContainer
+                      center={[36.7538, 3.0588]}
+                      zoom={11}
+                      style={{ height: '100%', width: '100%' }}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap" />
+                      <MapClickHandler onMapClick={handleMapClick} />
+                      {form.pickupLat !== 0 && (
+                        <Marker position={[form.pickupLat, form.pickupLng]} icon={pickupIcon}>
+                          <Popup>📍 {form.pickupAddress || 'Enlèvement'}</Popup>
+                        </Marker>
+                      )}
+                      {form.deliveryLat !== 0 && (
+                        <Marker position={[form.deliveryLat, form.deliveryLng]} icon={deliveryIcon}>
+                          <Popup>🏁 {form.deliveryAddress || 'Livraison'}</Popup>
+                        </Marker>
+                      )}
+                    </MapContainer>
+                  </div>
+
+                  {geocoding && (
+                    <div className="mono muted" style={{ fontSize: 10, marginTop: 4 }}>Recherche de l'adresse…</div>
+                  )}
+                </div>
+
+                {/* Address fields — auto-filled by Nominatim, still editable */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   <div>
                     <label className="wf-field-label">📍 Adresse d'enlèvement *</label>
                     <input
                       type="text" value={form.pickupAddress}
                       onChange={e => set('pickupAddress', e.target.value)}
-                      required placeholder="Hub Paris-Est · 12 av. République"
+                      required placeholder="Cliquez sur la carte ou saisissez"
                       className="wf-inp" style={{ marginTop: 4, width: '100%' }}
                     />
                   </div>
@@ -118,7 +220,7 @@ export default function NewMissionPage() {
                     <input
                       type="text" value={form.deliveryAddress}
                       onChange={e => set('deliveryAddress', e.target.value)}
-                      required placeholder="14 rue Daguerre, 75014 Paris"
+                      required placeholder="Cliquez sur la carte ou saisissez"
                       className="wf-inp" style={{ marginTop: 4, width: '100%' }}
                     />
                   </div>
