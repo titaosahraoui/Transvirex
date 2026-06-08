@@ -1,7 +1,14 @@
 import { Response } from 'express';
+import axios from 'axios';
+import PDFDocument from 'pdfkit';
 import { pool } from '../db/postgres';
 import { createSuccess, createError } from '@transvirex/shared';
 import { AuthenticatedRequest } from '../middleware/requireUser';
+
+function notifyUser(event: string, userId: string, data: unknown): void {
+  const url = `${process.env.NOTIFICATION_SERVICE_URL ?? 'http://localhost:4005'}/emit`;
+  axios.post(url, { event, userId, data }).catch(() => {});
+}
 
 // ── GET /billing/invoices?status=X ───────────────────────────────────────────
 export async function getInvoices(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -53,6 +60,54 @@ export async function getInvoiceById(req: AuthenticatedRequest, res: Response): 
   }
 }
 
+// ── GET /billing/invoices/:id/pdf ─────────────────────────────────────────────
+export async function downloadInvoicePdf(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, mission_id AS "missionId", client_name AS "clientName",
+              amount, status, generated_at AS "generatedAt", paid_at AS "paidAt"
+       FROM invoices WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json(createError('NOT_FOUND', 'Invoice not found'));
+      return;
+    }
+
+    const inv = result.rows[0];
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="invoice-${id}.pdf"`);
+
+    const doc = new PDFDocument({ margin: 50 });
+    doc.pipe(res);
+
+    doc.fontSize(22).font('Helvetica-Bold').text('TRANSVIREX', { align: 'right' });
+    doc.fontSize(14).font('Helvetica').text('Facture / Invoice', { align: 'right' });
+    doc.moveDown(2);
+
+    doc.fontSize(11).font('Helvetica-Bold').text(`Numéro: ${inv.id}`);
+    doc.font('Helvetica').text(`Client: ${inv.clientName}`);
+    doc.text(`Mission: ${inv.missionId}`);
+    doc.text(`Date: ${new Date(inv.generatedAt).toLocaleDateString('fr-FR')}`);
+    doc.text(`Statut: ${inv.status}`);
+    if (inv.paidAt) doc.text(`Payé le: ${new Date(inv.paidAt).toLocaleDateString('fr-FR')}`);
+    doc.moveDown();
+
+    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
+    doc.moveDown();
+
+    doc.fontSize(14).font('Helvetica-Bold').text(`Montant total: ${Number(inv.amount).toFixed(2)} €`, { align: 'right' });
+
+    doc.end();
+  } catch (err) {
+    console.error('[billing] downloadInvoicePdf error:', err);
+    if (!res.headersSent) res.status(500).json(createError('INTERNAL_ERROR', 'Failed to generate PDF'));
+  }
+}
+
 // ── POST /billing/invoices ────────────────────────────────────────────────────
 export async function createInvoice(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
@@ -71,11 +126,11 @@ export async function createInvoice(req: AuthenticatedRequest, res: Response): P
     }
 
     const result = await pool.query(
-      `INSERT INTO invoices (mission_id, client_name, amount)
-       VALUES ($1, $2, $3)
+      `INSERT INTO invoices (mission_id, client_name, amount, created_by)
+       VALUES ($1, $2, $3, $4)
        RETURNING id, mission_id AS "missionId", client_name AS "clientName",
                  amount, status, generated_at AS "generatedAt", paid_at AS "paidAt"`,
-      [missionId, clientName, amount]
+      [missionId, clientName, amount, req.user!.userId]
     );
 
     res.status(201).json(createSuccess(result.rows[0]));
@@ -100,8 +155,9 @@ export async function updateInvoiceStatus(req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Fetch current status
-    const current = await pool.query(`SELECT status FROM invoices WHERE id = $1`, [id]);
+    const current = await pool.query(
+      `SELECT status, created_by AS "createdBy" FROM invoices WHERE id = $1`, [id]
+    );
 
     if (current.rows.length === 0) {
       res.status(404).json(createError('NOT_FOUND', 'Invoice not found'));
@@ -109,8 +165,8 @@ export async function updateInvoiceStatus(req: AuthenticatedRequest, res: Respon
     }
 
     const currentStatus: string = current.rows[0].status;
+    const createdBy: string | null = current.rows[0].createdBy;
 
-    // Validate transition: draft→sent, sent→paid
     const allowed: Record<string, string[]> = {
       draft: ['sent'],
       sent:  ['paid'],
@@ -126,7 +182,6 @@ export async function updateInvoiceStatus(req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    // Set paid_at timestamp when marking as paid
     const paidAt = status === 'paid' ? new Date() : null;
 
     const result = await pool.query(
@@ -139,6 +194,13 @@ export async function updateInvoiceStatus(req: AuthenticatedRequest, res: Respon
     );
 
     res.json(createSuccess(result.rows[0]));
+
+    if (status === 'paid' && createdBy) {
+      notifyUser('invoice:paid', createdBy, {
+        invoiceId: id,
+        amount: result.rows[0].amount,
+      });
+    }
   } catch (err) {
     console.error('[billing] updateInvoiceStatus error:', err);
     res.status(500).json(createError('INTERNAL_ERROR', 'Failed to update invoice status'));
@@ -189,12 +251,15 @@ export async function recordPayment(req: AuthenticatedRequest, res: Response): P
       return;
     }
 
-    // Verify the invoice exists
-    const invoiceCheck = await pool.query(`SELECT id FROM invoices WHERE id = $1`, [invoiceId]);
+    const invoiceCheck = await pool.query(
+      `SELECT id, created_by AS "createdBy" FROM invoices WHERE id = $1`, [invoiceId]
+    );
     if (invoiceCheck.rows.length === 0) {
       res.status(404).json(createError('NOT_FOUND', 'Invoice not found'));
       return;
     }
+
+    const createdBy: string | null = invoiceCheck.rows[0].createdBy;
 
     const result = await pool.query(
       `INSERT INTO payments (invoice_id, amount, method)
@@ -205,6 +270,14 @@ export async function recordPayment(req: AuthenticatedRequest, res: Response): P
     );
 
     res.status(201).json(createSuccess(result.rows[0]));
+
+    if (createdBy) {
+      notifyUser('payment:recorded', createdBy, {
+        invoiceId,
+        paymentId: result.rows[0].id,
+        amount: result.rows[0].amount,
+      });
+    }
   } catch (err) {
     console.error('[billing] recordPayment error:', err);
     res.status(500).json(createError('INTERNAL_ERROR', 'Failed to record payment'));
@@ -212,7 +285,6 @@ export async function recordPayment(req: AuthenticatedRequest, res: Response): P
 }
 
 // ── GET /billing/stats ────────────────────────────────────────────────────────
-// Summary stats for the management dashboard
 export async function getBillingStats(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query(`

@@ -3,6 +3,7 @@ import { requireUser } from '../middleware/requireUser';
 import {
   getInvoices,
   getInvoiceById,
+  downloadInvoicePdf,
   createInvoice,
   updateInvoiceStatus,
   getPayments,
@@ -17,6 +18,7 @@ router.use(requireUser as any);
 
 // Invoices
 router.get('/invoices',              getInvoices as any);
+router.get('/invoices/:id/pdf',      downloadInvoicePdf as any);
 router.get('/invoices/:id',          getInvoiceById as any);
 router.post('/invoices',             createInvoice as any);
 router.patch('/invoices/:id/status', updateInvoiceStatus as any);

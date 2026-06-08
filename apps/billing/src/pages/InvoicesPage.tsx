@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 interface Invoice {
   id: string; missionId: string; clientName: string;
@@ -24,6 +25,7 @@ const billingNav = [
 
 export default function InvoicesPage() {
   const { user, logout } = useAuth();
+  const { socket } = useNotification();
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filter, setFilter]     = useState('all');
@@ -44,6 +46,15 @@ export default function InvoicesPage() {
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Socket-driven list refresh
+  useEffect(() => {
+    if (!socket) return;
+    const refresh = () => load();
+    socket.on('invoice:paid', refresh);
+    socket.on('payment:recorded', refresh);
+    return () => { socket.off('invoice:paid', refresh); socket.off('payment:recorded', refresh); };
+  }, [socket, load]);
 
   useEffect(() => {
     if (newForm.missionId.length < 8) return;
@@ -83,6 +94,19 @@ export default function InvoicesPage() {
       await api.patch(`/billing/invoices/${id}/status`, { status });
       load();
     } catch { console.error(`Impossible de passer à : ${status}`); }
+  }
+
+  async function downloadPdf(invoiceId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    try {
+      const response = await api.get(`/billing/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `facture-${invoiceId.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { console.error('PDF download failed'); }
   }
 
   const total = invoices.reduce((s, inv) => s + parseFloat(inv.amount), 0);
@@ -237,7 +261,7 @@ export default function InvoicesPage() {
                       <td className="mono" style={{ fontSize: 11 }}>
                         {new Date(inv.generatedAt).toLocaleDateString('fr-FR')}
                       </td>
-                      <td onClick={e => e.stopPropagation()}>
+                      <td onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         {inv.status === 'draft' && (
                           <button className="wf-btn sm warn" onClick={() => markStatus(inv.id, 'sent')}>
                             Envoyer
@@ -253,6 +277,9 @@ export default function InvoicesPage() {
                             {inv.paidAt ? new Date(inv.paidAt).toLocaleDateString('fr-FR') : '✓'}
                           </span>
                         )}
+                        <button className="wf-btn sm" title="Télécharger PDF" onClick={e => downloadPdf(inv.id, e)}>
+                          ⬇
+                        </button>
                       </td>
                     </tr>
                   ))}

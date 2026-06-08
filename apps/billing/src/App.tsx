@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -10,6 +11,7 @@ import StatsPage from './pages/StatsPage';
 export default function App() {
   return (
     <AuthProvider>
+      <NotificationProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -20,6 +22,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/invoices" replace />} />
         </Routes>
       </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

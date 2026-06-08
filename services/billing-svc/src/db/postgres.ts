@@ -29,4 +29,12 @@ export async function initSchema(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_invoices_status     ON invoices(status);
     CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(invoice_id);
   `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by UUID;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END $$;
+  `);
 }
