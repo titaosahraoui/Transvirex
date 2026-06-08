@@ -13,7 +13,7 @@ interface Mission {
   deadline: string | null; status: string; driverId: string | null;
   createdBy: string; createdAt: string;
   price: string; missionType: string; weightKg: string;
-  notes: string | null; priority: string;
+  notes: string | null; priority: string; podPhotoUrl?: string;
 }
 interface Suggestion {
   driverId: string; name: string; score: number;
@@ -46,7 +46,7 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 const EVENT_ICON: Record<string, string> = {
-  completed: '✓', failed: '⚠', in_progress: '●', cancelled: '✕', rejected: '✕',
+  completed: '✓', failed: '⚠', in_progress: '●', cancelled: '✕', rejected: '✕', pod: '📷',
 };
 
 const pickupIcon  = L.divIcon({ className: '', html: '📍', iconSize: [28, 28], iconAnchor: [14, 28] });
@@ -651,6 +651,20 @@ export default function MissionDetailPage() {
                   {driverDetail && (
                     <div className="mono muted" style={{ fontSize: 11, marginTop: 6 }}>par {driverDetail.name}</div>
                   )}
+                </div>
+              )}
+
+              {/* POD photo */}
+              {mission.status === 'completed' && mission.podPhotoUrl && (
+                <div className="wf-box solid" style={{ padding: '12px 14px' }}>
+                  <div className="mono muted" style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 8 }}>
+                    Photo de livraison
+                  </div>
+                  <img
+                    src={`${import.meta.env.VITE_GATEWAY_URL ?? 'http://localhost:4000'}/mission-uploads/${mission.podPhotoUrl}`}
+                    alt="Preuve de livraison"
+                    style={{ width: '100%', borderRadius: 8, maxHeight: 300, objectFit: 'cover' }}
+                  />
                 </div>
               )}
               {mission.status === 'failed' && (

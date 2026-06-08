@@ -64,4 +64,13 @@ export async function initSchema(): Promise<void> {
     EXCEPTION WHEN OTHERS THEN NULL;
     END $$;
   `);
+
+  // Idempotent migration: add proof-of-delivery photo URL column.
+  await pool.query(`
+    DO $$
+    BEGIN
+      ALTER TABLE missions ADD COLUMN IF NOT EXISTS pod_photo_url TEXT;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END $$;
+  `);
 }

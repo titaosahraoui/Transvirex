@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, useAuth } from '../context/AuthContext';
 import { useSocket } from '../hooks/useSocket';
@@ -10,6 +10,52 @@ interface Mission {
   pickupLat: number; pickupLng: number; deliveryAddress: string;
   deliveryLat: number; deliveryLng: number;
   deadline: string | null; status: string; driverId: string | null;
+  podPhotoUrl?: string;
+}
+
+function PodUpload({ missionId, onUploaded }: { missionId: string; onUploaded: () => void }) {
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function handleFile(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setPreview(URL.createObjectURL(f));
+  }
+
+  async function handleUpload() {
+    const f = fileRef.current?.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('photo', f);
+      await api.post(`/missions/${missionId}/pod`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      onUploaded();
+    } catch (err) {
+      console.error(err);
+    } finally { setUploading(false); }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {preview && (
+        <img src={preview} alt="Aperçu" style={{ width: '100%', borderRadius: 8, maxHeight: 200, objectFit: 'cover' }} />
+      )}
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} style={{ display: 'none' }} />
+      <button className="wf-btn" style={{ width: '100%' }} onClick={() => fileRef.current?.click()}>
+        📷 Choisir une photo
+      </button>
+      {preview && (
+        <button className="wf-btn fill" style={{ width: '100%' }} disabled={uploading} onClick={handleUpload}>
+          {uploading ? 'Envoi…' : '✓ Envoyer la photo'}
+        </button>
+      )}
+    </div>
+  );
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -302,6 +348,20 @@ export default function MissionDetailPage() {
         {mission.status === 'completed' && (
           <div className="wf-box" style={{ background: '#e3f4dc', borderStyle: 'solid', borderColor: 'var(--good)', textAlign: 'center' }}>
             <div style={{ fontFamily: 'var(--font-script)', fontSize: 22, fontWeight: 700 }}>✓ Mission livrée</div>
+          </div>
+        )}
+
+        {mission.status === 'completed' && (
+          <div className="wf-box solid" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontWeight: 700, fontSize: 13 }}>📷 Photo de livraison</div>
+            {mission.podPhotoUrl ? (
+              <div className="mono" style={{ fontSize: 11, color: 'var(--good)' }}>✓ Photo envoyée</div>
+            ) : (
+              <PodUpload
+                missionId={mission.id}
+                onUploaded={() => setMission(prev => prev ? { ...prev, podPhotoUrl: 'uploaded' } : prev)}
+              />
+            )}
           </div>
         )}
 

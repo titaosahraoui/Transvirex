@@ -92,7 +92,8 @@ export async function getMissionById(req: AuthenticatedRequest, res: Response): 
               created_by AS "createdBy", created_at AS "createdAt",
               price, mission_type AS "missionType", weight_kg AS "weightKg",
               notes, priority,
-              completed_at AS "completedAt", rejected_reason AS "rejectedReason"
+              completed_at AS "completedAt", rejected_reason AS "rejectedReason",
+              pod_photo_url AS "podPhotoUrl"
        FROM missions WHERE id = $1`,
       [id]
     );
@@ -294,6 +295,11 @@ export async function updateMissionStatus(
       return;
     }
 
+    if (current.rows[0].driver_id !== req.user!.userId) {
+      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
+      return;
+    }
+
     const currentStatus: string        = current.rows[0].status;
     const currentDriverId: string|null = current.rows[0].driver_id;
     const createdBy: string            = current.rows[0].created_by;
@@ -357,13 +363,19 @@ export async function updateDriverLocation(
     }
 
     const missionRes = await pool.query(
-      `SELECT status, created_by FROM missions WHERE id = $1`, [id]
+      `SELECT status, driver_id, created_by FROM missions WHERE id = $1`, [id]
     );
 
     if (missionRes.rows.length === 0) {
       res.status(404).json(createError('NOT_FOUND', 'Mission not found'));
       return;
     }
+
+    if (missionRes.rows[0].driver_id !== req.user!.userId) {
+      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
+      return;
+    }
+
     if (missionRes.rows[0].status !== 'in_progress') {
       res.status(409).json(
         createError('INVALID_STATUS', 'Location updates are only allowed for in_progress missions')
@@ -591,6 +603,12 @@ export async function rejectMission(req: AuthenticatedRequest, res: Response): P
       res.status(404).json(createError('NOT_FOUND', 'Mission not found'));
       return;
     }
+
+    if (current.rows[0].driver_id !== req.user!.userId) {
+      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
+      return;
+    }
+
     if (current.rows[0].status !== 'assigned') {
       res.status(409).json(
         createError('INVALID_TRANSITION', `Cannot reject a mission with status '${current.rows[0].status}'`)
@@ -653,5 +671,56 @@ export async function getMissionLocationHistory(
   } catch (err) {
     console.error('[mission] getMissionLocationHistory error:', err);
     res.status(500).json(createError('INTERNAL_ERROR', 'Failed to fetch location history'));
+  }
+}
+
+// ── POST /missions/:id/pod ────────────────────────────────────────────────────
+// Driver uploads a proof-of-delivery photo after completing a mission.
+export async function uploadPod(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const file = (req as any).file as { filename: string } | undefined;
+
+    if (!file) {
+      res.status(400).json(createError('MISSING_FILE', 'No photo uploaded'));
+      return;
+    }
+
+    const result = await pool.query(
+      'SELECT status, driver_id AS "driverId", created_by AS "createdBy" FROM missions WHERE id = $1',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json(createError('NOT_FOUND', 'Mission not found'));
+      return;
+    }
+
+    if (result.rows[0].driverId !== req.user!.userId) {
+      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
+      return;
+    }
+
+    if (result.rows[0].status !== 'completed') {
+      res.status(409).json(createError('INVALID_STATE', 'POD can only be uploaded for completed missions'));
+      return;
+    }
+
+    const { driverId, createdBy } = result.rows[0];
+    const filename = file.filename;
+
+    await pool.query('UPDATE missions SET pod_photo_url = $1 WHERE id = $2', [filename, id]);
+
+    Promise.resolve(
+      DeliveryEvent.create({
+        mission_id: id, driver_id: driverId, status: 'pod',
+        location: { lat: 0, lng: 0 }, podPhotoUrl: filename, timestamp: new Date(),
+      })
+    ).catch((err: unknown) => console.error('[mission] POD DeliveryEvent save failed:', err));
+
+    res.json(createSuccess({ podPhotoUrl: filename }));
+    notifyUser('mission:pod', createdBy, { missionId: id, podPhotoUrl: filename });
+  } catch (err) {
+    console.error('[mission] uploadPod error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to upload POD'));
   }
 }
