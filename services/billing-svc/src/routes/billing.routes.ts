@@ -9,6 +9,7 @@ import {
   getPayments,
   recordPayment,
   getBillingStats,
+  getSlaStats,
 } from '../controllers/billing.controller';
 
 const router = Router();
@@ -29,5 +30,8 @@ router.post('/payments', recordPayment as any);
 
 // Stats (management dashboard)
 router.get('/stats', getBillingStats as any);
+
+// SLA & delays
+router.get('/sla', getSlaStats as any);
 
 export default router;

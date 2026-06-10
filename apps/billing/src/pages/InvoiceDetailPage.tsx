@@ -4,7 +4,7 @@ import { useAuth, api } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 
 interface Invoice {
-  id: string; missionId: string; clientName: string;
+  id: string; reference?: string; missionId: string; clientName: string;
   amount: string; status: string; generatedAt: string; paidAt: string | null;
 }
 interface Payment {
@@ -21,6 +21,7 @@ const billingNav = [
   'FACTURATION',
   { key: 'inv',   icon: '🧾', label: 'Factures',     path: '/invoices' },
   { key: 'stats', icon: '📊', label: 'Statistiques', path: '/stats' },
+  { key: 'sla',   icon: '⏱',  label: 'SLA & Délais', path: '/sla' },
   'PARAMÈTRES',
   { key: 'set',   icon: '⚙',  label: 'Paramètres' },
 ];
@@ -150,7 +151,7 @@ export default function InvoiceDetailPage() {
       </aside>
 
       {/* Main */}
-      <div className="wf-shell-main">
+      <main className="wf-shell-main">
         <div className="wf-appbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="mono muted" style={{ cursor: 'pointer', fontSize: 11 }} onClick={() => navigate('/invoices')}>
@@ -182,8 +183,15 @@ export default function InvoiceDetailPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div className="script" style={{ fontSize: 28, lineHeight: 1 }}>{invoice.clientName}</div>
-                <div className="mono muted" style={{ fontSize: 10.5, marginTop: 2 }}>
-                  Facture {invoice.id.slice(0, 8)} · {statusLabel}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  {invoice.reference && (
+                    <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', letterSpacing: '.04em' }}>
+                      {invoice.reference}
+                    </span>
+                  )}
+                  <span className="mono muted" style={{ fontSize: 10.5 }}>
+                    · {statusLabel}
+                  </span>
                 </div>
               </div>
 
@@ -318,7 +326,7 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

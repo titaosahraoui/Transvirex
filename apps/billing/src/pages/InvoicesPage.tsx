@@ -4,8 +4,20 @@ import { useAuth, api } from '../context/AuthContext';
 import { useNotification } from '../context/NotificationContext';
 
 interface Invoice {
-  id: string; missionId: string; clientName: string;
+  id: string; reference?: string; missionId: string; clientName: string;
   amount: string; status: string; generatedAt: string; paidAt: string | null;
+}
+
+function validateInvoiceForm(form: { missionId: string; clientName: string; amount: string }): string[] {
+  const errors: string[] = [];
+  if (!form.missionId.trim()) errors.push('L\'ID Mission est requis.');
+  else if (form.missionId.trim().length < 8) errors.push('L\'ID Mission doit contenir au moins 8 caractères.');
+  if (!form.clientName.trim()) errors.push('Le nom du client est requis.');
+  else if (form.clientName.trim().length < 2) errors.push('Le nom du client doit contenir au moins 2 caractères.');
+  if (!form.amount) errors.push('Le montant est requis.');
+  else if (isNaN(parseFloat(form.amount)) || parseFloat(form.amount) <= 0)
+    errors.push('Le montant doit être un nombre positif.');
+  return errors;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -19,6 +31,7 @@ const billingNav = [
   'FACTURATION',
   { key: 'inv',   icon: '🧾', label: 'Factures',     path: '/invoices' },
   { key: 'stats', icon: '📊', label: 'Statistiques', path: '/stats' },
+  { key: 'sla',   icon: '⏱',  label: 'SLA & Délais', path: '/sla' },
   'PARAMÈTRES',
   { key: 'set',   icon: '⚙',  label: 'Paramètres' },
 ];
@@ -30,10 +43,12 @@ export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [filter, setFilter]     = useState('all');
   const [loading, setLoading]   = useState(true);
-  const [showNew, setShowNew]   = useState(false);
-  const [newForm, setNewForm]   = useState({ missionId: '', clientName: '', amount: '' });
-  const [creating, setCreating] = useState(false);
-  const [fetching, setFetching] = useState(false);
+  const [showNew, setShowNew]     = useState(false);
+  const [newForm, setNewForm]     = useState({ missionId: '', clientName: '', amount: '' });
+  const [creating, setCreating]   = useState(false);
+  const [fetching, setFetching]   = useState(false);
+  const [formErrors, setFormErrors] = useState<string[]>([]);
+  const [touched, setTouched]     = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -75,6 +90,11 @@ export default function InvoicesPage() {
   }, [newForm.missionId]);
 
   async function createInvoice() {
+    setTouched(true);
+    const errors = validateInvoiceForm(newForm);
+    setFormErrors(errors);
+    if (errors.length > 0) return;
+
     setCreating(true);
     try {
       await api.post('/billing/invoices', {
@@ -84,9 +104,24 @@ export default function InvoicesPage() {
       });
       setShowNew(false);
       setNewForm({ missionId: '', clientName: '', amount: '' });
+      setFormErrors([]);
+      setTouched(false);
       load();
     } catch { console.error('Impossible de créer la facture'); }
     finally { setCreating(false); }
+  }
+
+  function closeNewForm() {
+    setShowNew(false);
+    setNewForm({ missionId: '', clientName: '', amount: '' });
+    setFormErrors([]);
+    setTouched(false);
+  }
+
+  function handleFormChange(field: string, value: string) {
+    const next = { ...newForm, [field]: value };
+    setNewForm(next as any);
+    if (touched) setFormErrors(validateInvoiceForm(next as any));
   }
 
   async function markStatus(id: string, status: string) {
@@ -139,7 +174,7 @@ export default function InvoicesPage() {
       </aside>
 
       {/* Main */}
-      <div className="wf-shell-main">
+      <main className="wf-shell-main">
         <div className="wf-appbar">
           <span className="bar-crumbs">Facturation / Factures</span>
           <div className="bar-actions">
@@ -183,45 +218,86 @@ export default function InvoicesPage() {
 
           {/* Modal: nouvelle facture */}
           {showNew && (
-            <div style={{
-              position: 'fixed', inset: 0, background: 'rgba(31,29,26,.45)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20,
-            }}>
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="new-invoice-title"
+              style={{
+                position: 'fixed', inset: 0, background: 'rgba(31,29,26,.45)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 20,
+              }}
+            >
               <div className="wf-box solid" style={{ width: '100%', maxWidth: 440, padding: '20px 22px' }}>
-                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
+                <div id="new-invoice-title" style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>
                   <span className="script">Générer une facture</span>
                 </div>
+
+                {/* Validation errors — all shown at once */}
+                {formErrors.length > 0 && (
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    style={{
+                      background: '#ffeaea', border: '1px solid var(--bad)', borderRadius: 6,
+                      padding: '10px 12px', marginBottom: 14,
+                    }}
+                  >
+                    <div className="mono" style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, color: 'var(--bad)' }}>
+                      Veuillez corriger les erreurs suivantes :
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 16 }}>
+                      {formErrors.map((e, i) => (
+                        <li key={i} style={{ fontSize: 12, color: 'var(--bad)', lineHeight: 1.6 }}>{e}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label className="wf-field-label">ID Mission *</label>
+                      <label htmlFor="inv-missionId" className="wf-field-label">ID Mission *</label>
                       {fetching && <span className="mono muted" style={{ fontSize: 10 }}>Chargement…</span>}
                     </div>
                     <input
+                      id="inv-missionId"
                       type="text"
                       value={newForm.missionId}
-                      onChange={e => setNewForm(p => ({ ...p, missionId: e.target.value }))}
-                      className="wf-inp box" style={{ width: '100%', marginTop: 4 }}
+                      onChange={e => handleFormChange('missionId', e.target.value)}
+                      className="wf-inp box"
+                      style={{ width: '100%', marginTop: 4, borderColor: touched && !newForm.missionId ? 'var(--bad)' : undefined }}
                       placeholder="ID de la mission (8 caractères min.)"
+                      aria-required="true"
+                      aria-describedby={formErrors.length > 0 ? 'form-errors' : undefined}
                     />
                   </div>
                   {[
-                    { label: 'Nom client',    field: 'clientName', type: 'text'   },
-                    { label: 'Montant (DZD)', field: 'amount',     type: 'number' },
-                  ].map(({ label, field, type }) => (
+                    { label: 'Nom client *',   id: 'inv-clientName', field: 'clientName', type: 'text'   },
+                    { label: 'Montant (DZD) *', id: 'inv-amount',    field: 'amount',     type: 'number' },
+                  ].map(({ label, id, field, type }) => (
                     <div key={field}>
-                      <label className="wf-field-label">{label}</label>
+                      <label htmlFor={id} className="wf-field-label">{label}</label>
                       <input
+                        id={id}
                         type={type}
                         value={(newForm as any)[field]}
-                        onChange={e => setNewForm(p => ({ ...p, [field]: e.target.value }))}
-                        className="wf-inp box" style={{ width: '100%', marginTop: 4 }}
+                        onChange={e => handleFormChange(field, e.target.value)}
+                        className="wf-inp box"
+                        style={{ width: '100%', marginTop: 4 }}
+                        aria-required="true"
+                        min={type === 'number' ? '0.01' : undefined}
+                        step={type === 'number' ? '0.01' : undefined}
                       />
                     </div>
                   ))}
                   <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 4 }}>
-                    <button className="wf-btn" onClick={() => setShowNew(false)}>Annuler</button>
-                    <button className="wf-btn fill" disabled={creating} onClick={createInvoice}>
+                    <button className="wf-btn" onClick={closeNewForm}>Annuler</button>
+                    <button
+                      className="wf-btn fill"
+                      disabled={creating}
+                      onClick={createInvoice}
+                      aria-busy={creating}
+                    >
                       {creating ? 'Création…' : 'Créer'}
                     </button>
                   </div>
@@ -238,14 +314,17 @@ export default function InvoicesPage() {
               <table className="wf-table">
                 <thead>
                   <tr>
-                    {['Client', 'Mission', 'Montant', 'Statut', 'Générée le', 'Actions'].map(h => (
-                      <th key={h}>{h}</th>
+                    {['Référence', 'Client', 'Mission', 'Montant', 'Statut', 'Générée le', 'Actions'].map(h => (
+                      <th key={h} scope="col">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {invoices.map(inv => (
                     <tr key={inv.id} style={{ cursor: 'pointer' }} onClick={() => navigate(`/invoices/${inv.id}`)}>
+                      <td className="mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', whiteSpace: 'nowrap' }}>
+                        {inv.reference ?? '—'}
+                      </td>
                       <td><b>{inv.clientName}</b></td>
                       <td className="mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                         {inv.missionId.slice(0, 8)}…
@@ -285,7 +364,7 @@ export default function InvoicesPage() {
                   ))}
                   {invoices.length === 0 && (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '32px 0' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '32px 0' }}>
                         — Aucune facture —
                       </td>
                     </tr>
@@ -295,7 +374,7 @@ export default function InvoicesPage() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

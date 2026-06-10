@@ -5,6 +5,8 @@ export const pool = new Pool({
 });
 
 export async function initSchema(): Promise<void> {
+  await pool.query(`CREATE SEQUENCE IF NOT EXISTS invoice_seq START 1`);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS invoices (
       id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -35,6 +37,22 @@ export async function initSchema(): Promise<void> {
     BEGIN
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS created_by UUID;
     EXCEPTION WHEN OTHERS THEN NULL;
+    END $$;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      ALTER TABLE invoices ADD COLUMN reference VARCHAR(30) UNIQUE;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      ALTER TABLE invoices ADD CONSTRAINT invoices_mission_id_unique UNIQUE (mission_id);
+    EXCEPTION WHEN duplicate_table OR duplicate_object OR others THEN NULL;
     END $$;
   `);
 }

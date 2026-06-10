@@ -22,10 +22,12 @@ const STATUS_PILL: Record<string, string> = {
 const mgmtNav = [
   'PERFORMANCE',
   { key: 'dash', icon: '📊', label: 'Tableau de bord', path: '/dashboard' },
-  { key: 'sla',  icon: '⏱',  label: 'SLA & délais' },
+  { key: 'sla',  icon: '⏱',  label: 'SLA & délais', path: '/sla' },
   'FLOTTE',
   { key: 'drv',  icon: '🚐', label: 'Chauffeurs', path: '/drivers' },
-  { key: 'geo',  icon: '🗺',  label: 'Géographie' },
+  { key: 'geo',  icon: '🗺',  label: 'Géographie', path: '/geo' },
+  'ADMINISTRATION',
+  { key: 'team', icon: '👥', label: 'Équipe',      path: '/team' },
 ];
 
 function AcceptanceBar({ value }: { value: number }) {
@@ -95,7 +97,7 @@ export default function DriversPage() {
       </aside>
 
       {/* Main */}
-      <div className="wf-shell-main">
+      <main className="wf-shell-main">
         <div className="wf-appbar">
           <span className="bar-crumbs">Flotte / Chauffeurs</span>
           <div className="bar-actions">
@@ -200,7 +202,7 @@ export default function DriversPage() {
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

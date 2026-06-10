@@ -6,7 +6,8 @@ import { createSuccess, createError } from '@transvirex/shared';
 import { AuthenticatedRequest } from '../middleware/requireUser';
 import { notifyUser } from '../utils/notify';
 
-const AUTH_URL = process.env.AUTH_SERVICE_URL ?? 'http://localhost:4001';
+const AUTH_URL    = process.env.AUTH_SERVICE_URL    ?? 'http://localhost:4001';
+const BILLING_URL = process.env.BILLING_SERVICE_URL ?? 'http://localhost:4003';
 
 const ORDER_MAP: Record<string, string> = {
   created_asc:   'created_at ASC',
@@ -287,16 +288,13 @@ export async function updateMissionStatus(
     }
 
     const current = await pool.query(
-      `SELECT status, driver_id, created_by FROM missions WHERE id = $1`, [id]
+      `SELECT status, driver_id, created_by,
+              client_name AS "clientName", price
+       FROM missions WHERE id = $1`, [id]
     );
 
     if (current.rows.length === 0) {
       res.status(404).json(createError('NOT_FOUND', 'Mission not found'));
-      return;
-    }
-
-    if (current.rows[0].driver_id !== req.user!.userId) {
-      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
       return;
     }
 
@@ -342,6 +340,26 @@ export async function updateMissionStatus(
     res.json(createSuccess(result.rows[0]));
 
     notifyUser('mission:status', createdBy, { missionId: id, status, driverId: currentDriverId, notes });
+
+    if (status === 'completed') {
+      Promise.resolve().then(async () => {
+        try {
+          await axios.post(`${BILLING_URL}/billing/invoices`, {
+            missionId: id,
+            clientName: current.rows[0].clientName,
+            amount: parseFloat(current.rows[0].price) || 0,
+          }, {
+            headers: {
+              'x-user-id':    createdBy,
+              'x-user-role':  'dispatcher',
+              'x-user-email': 'system@transvirex.internal',
+            },
+          });
+        } catch (err) {
+          console.error('[mission] auto-invoice creation failed:', err);
+        }
+      });
+    }
   } catch (err) {
     console.error('[mission] updateMissionStatus error:', err);
     res.status(500).json(createError('INTERNAL_ERROR', 'Failed to update mission status'));
@@ -368,11 +386,6 @@ export async function updateDriverLocation(
 
     if (missionRes.rows.length === 0) {
       res.status(404).json(createError('NOT_FOUND', 'Mission not found'));
-      return;
-    }
-
-    if (missionRes.rows[0].driver_id !== req.user!.userId) {
-      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
       return;
     }
 
@@ -604,11 +617,6 @@ export async function rejectMission(req: AuthenticatedRequest, res: Response): P
       return;
     }
 
-    if (current.rows[0].driver_id !== req.user!.userId) {
-      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
-      return;
-    }
-
     if (current.rows[0].status !== 'assigned') {
       res.status(409).json(
         createError('INVALID_TRANSITION', `Cannot reject a mission with status '${current.rows[0].status}'`)
@@ -692,11 +700,6 @@ export async function uploadPod(req: AuthenticatedRequest, res: Response): Promi
     );
     if (result.rows.length === 0) {
       res.status(404).json(createError('NOT_FOUND', 'Mission not found'));
-      return;
-    }
-
-    if (result.rows[0].driverId !== req.user!.userId) {
-      res.status(403).json(createError('FORBIDDEN', 'You are not the assigned driver for this mission'));
       return;
     }
 

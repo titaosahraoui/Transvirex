@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, useAuth } from '../context/AuthContext';
-import { useSocket } from '../hooks/useSocket';
+import { useNotification } from '../context/NotificationContext';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 
@@ -90,8 +90,7 @@ function FitBounds({ bounds }: { bounds: [[number, number], [number, number]] })
 export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = useAuth();
-  const socketRef = useSocket(token);
+  const { socket } = useNotification();
   const watchIdRef = useRef<number | null>(null);
   const [mission, setMission]     = useState<Mission | null>(null);
   const [loading, setLoading]     = useState(true);
@@ -110,7 +109,6 @@ export default function MissionDetailPage() {
 
   // Real-time: dispatcher cancels this mission while driver is viewing it
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket) return;
     const handler = (data: { missionId?: string; status?: string }) => {
       if (data.missionId !== id || data.status !== 'cancelled') return;
@@ -118,7 +116,7 @@ export default function MissionDetailPage() {
     };
     socket.on('mission:status', handler);
     return () => { socket.off('mission:status', handler); };
-  }, [socketRef.current, id]);
+  }, [socket, id]);
 
   function startGPS() {
     if (!navigator.geolocation || !mission) return;

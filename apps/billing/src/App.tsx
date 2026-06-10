@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage';
 import InvoicesPage from './pages/InvoicesPage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import StatsPage from './pages/StatsPage';
+import SLAPage from './pages/SLAPage';
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="/invoices" element={<ProtectedRoute><InvoicesPage /></ProtectedRoute>} />
           <Route path="/invoices/:id" element={<ProtectedRoute><InvoiceDetailPage /></ProtectedRoute>} />
           <Route path="/stats" element={<ProtectedRoute><StatsPage /></ProtectedRoute>} />
+          <Route path="/sla"   element={<ProtectedRoute><SLAPage /></ProtectedRoute>} />
           <Route path="/" element={<Navigate to="/invoices" replace />} />
         </Routes>
       </BrowserRouter>

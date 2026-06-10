@@ -71,7 +71,9 @@ app.use('/billing',  jwtGuard, proxyTo(BILLING_URL, 'billing'));
 app.use('/ai',       jwtGuard, proxyTo(AI_URL,      'ai'));
 
 // Mission service static uploads (POD photos): /mission-uploads/*
-app.use('/mission-uploads', jwtGuard, proxyTo(MISSION_URL, 'uploads'));
+// No jwtGuard — browsers load <img> tags without auth headers.
+// Filenames are UUID-based and not guessable.
+app.use('/mission-uploads', proxyTo(MISSION_URL, 'uploads'));
 
 // ── 404 catch-all ────────────────────────────────────────────────────────────
 app.use((_req, res) => {

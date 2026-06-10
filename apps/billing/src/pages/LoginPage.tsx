@@ -23,27 +23,31 @@ export default function LoginPage() {
 
   return (
     <div className="wf-login">
-      <div className="wf-login-card">
+      <main className="wf-login-card" aria-label="Connexion">
         <div className="wf-login-brand">transvirex<span style={{ color: 'var(--accent)' }}>.</span></div>
         <div className="wf-login-sub">Facturation · Gestion des factures</div>
 
-        {error && <div className="wf-error">{error}</div>}
+        {error && <div className="wf-error" role="alert">{error}</div>}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label className="wf-field-label">Email</label>
+            <label htmlFor="login-email" className="wf-field-label">Email</label>
             <input
+              id="login-email"
               type="email" value={email} onChange={e => setEmail(e.target.value)} required
               className="wf-inp box" placeholder="facturation@transvirex.fr"
               style={{ width: '100%' }}
+              autoComplete="email"
             />
           </div>
           <div>
-            <label className="wf-field-label">Mot de passe</label>
+            <label htmlFor="login-password" className="wf-field-label">Mot de passe</label>
             <input
+              id="login-password"
               type="password" value={password} onChange={e => setPassword(e.target.value)} required
               className="wf-inp box" placeholder="••••••••"
               style={{ width: '100%' }}
+              autoComplete="current-password"
             />
           </div>
           <button type="submit" disabled={loading} className="wf-btn fill block" style={{ marginTop: 6 }}>
@@ -58,7 +62,7 @@ export default function LoginPage() {
             Créer un compte
           </Link>
         </p>
-      </div>
+      </main>
     </div>
   );
 }

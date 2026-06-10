@@ -4,7 +4,15 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import { createSuccess, createError } from '@transvirex/shared';
 import { validateSocketToken, registerHandlers, userSocketMap } from './socket/handlers';
+import { Message } from './db/mongo';
 export { userSocketMap }; // re-export for tests
+
+function httpAuth(req: any, res: any, next: any) {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json(createError('UNAUTHORIZED', 'Token required'));
+  try { req.user = validateSocketToken(token); next(); }
+  catch { res.status(401).json(createError('INVALID_TOKEN', 'Invalid token')); }
+}
 
 // ── Express app ───────────────────────────────────────────────────────────────
 export const app = express();
@@ -77,6 +85,59 @@ app.post('/emit', (req, res) => {
 
   // Always 200 — caller shouldn't care if the user is offline
   res.json(createSuccess({ delivered: !!socketId }));
+});
+
+// GET /messages?with=:otherUserId&limit=50
+app.get('/messages', httpAuth, async (req: any, res: any) => {
+  try {
+    const { with: otherId, limit = '50' } = req.query;
+    if (!otherId) return res.status(400).json(createError('MISSING_FIELD', 'with query param required'));
+    const conversationId = [req.user.userId, String(otherId)].sort().join('_');
+    const msgs = await Message.find({ conversationId })
+      .sort({ timestamp: -1 })
+      .limit(parseInt(limit as string));
+    res.json(createSuccess(msgs.reverse()));
+  } catch (err) {
+    console.error('[notification] GET /messages error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to fetch messages'));
+  }
+});
+
+// GET /conversations
+app.get('/conversations', httpAuth, async (req: any, res: any) => {
+  try {
+    const userId = req.user.userId;
+    const convos = await Message.aggregate([
+      { $match: { $or: [{ senderId: userId }, { receiverId: userId }] } },
+      { $sort: { timestamp: -1 } },
+      { $group: {
+          _id: '$conversationId',
+          lastMessage: { $first: '$$ROOT' },
+          unread: { $sum: { $cond: [{ $and: [{ $eq: ['$receiverId', userId] }, { $eq: ['$read', false] }] }, 1, 0] } },
+      }},
+    ]);
+    res.json(createSuccess(convos));
+  } catch (err) {
+    console.error('[notification] GET /conversations error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to fetch conversations'));
+  }
+});
+
+// PATCH /messages/read?with=:otherUserId
+app.patch('/messages/read', httpAuth, async (req: any, res: any) => {
+  try {
+    const { with: otherId } = req.query;
+    if (!otherId) return res.status(400).json(createError('MISSING_FIELD', 'with query param required'));
+    const conversationId = [req.user.userId, String(otherId)].sort().join('_');
+    await Message.updateMany(
+      { conversationId, receiverId: req.user.userId, read: false },
+      { read: true }
+    );
+    res.json(createSuccess({ ok: true }));
+  } catch (err) {
+    console.error('[notification] PATCH /messages/read error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to mark messages read'));
+  }
 });
 
 // 404 catch-all

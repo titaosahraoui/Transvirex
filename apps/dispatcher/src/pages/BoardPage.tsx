@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
-import { useSocket } from '../hooks/useSocket';
+import { useNotification } from '../context/NotificationContext';
 import { dispatchNav } from '../lib/dispatchNav';
 
 interface Mission {
@@ -43,8 +43,8 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 export default function BoardPage() {
-  const { user, logout, token } = useAuth();
-  const socketRef = useSocket(token);
+  const { user, logout } = useAuth();
+  const { socket } = useNotification();
   const navigate = useNavigate();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -66,11 +66,10 @@ export default function BoardPage() {
 
   // Real-time: refresh board immediately when a driver updates mission status
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket) return;
     socket.on('mission:status', load);
     return () => { socket.off('mission:status', load); };
-  }, [socketRef.current, load]);
+  }, [socket, load]);
 
   const byStatus = (status: string) => missions.filter(m => m.status === status);
   const total = missions.length;
@@ -111,10 +110,10 @@ export default function BoardPage() {
           <div className="bar-actions">
             {/* Socket connection indicator */}
             <span
-              title={socketRef.current?.connected ? 'Temps réel actif' : 'Hors ligne'}
+              title={socket?.connected ? 'Temps réel actif' : 'Hors ligne'}
               style={{
                 width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-                background: socketRef.current?.connected ? 'var(--good)' : 'var(--ink-3)',
+                background: socket?.connected ? 'var(--good)' : 'var(--ink-3)',
                 flexShrink: 0,
               }}
             />

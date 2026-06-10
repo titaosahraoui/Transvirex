@@ -16,7 +16,7 @@ export async function getInvoices(req: AuthenticatedRequest, res: Response): Pro
     const { status } = req.query as { status?: string };
 
     let query = `
-      SELECT id, mission_id AS "missionId", client_name AS "clientName",
+      SELECT id, reference, mission_id AS "missionId", client_name AS "clientName",
              amount, status, generated_at AS "generatedAt", paid_at AS "paidAt"
       FROM invoices
     `;
@@ -42,7 +42,7 @@ export async function getInvoiceById(req: AuthenticatedRequest, res: Response): 
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT id, mission_id AS "missionId", client_name AS "clientName",
+      `SELECT id, reference, mission_id AS "missionId", client_name AS "clientName",
               amount, status, generated_at AS "generatedAt", paid_at AS "paidAt"
        FROM invoices WHERE id = $1`,
       [id]
@@ -65,7 +65,7 @@ export async function downloadInvoicePdf(req: AuthenticatedRequest, res: Respons
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT id, mission_id AS "missionId", client_name AS "clientName",
+      `SELECT id, reference, mission_id AS "missionId", client_name AS "clientName",
               amount, status, generated_at AS "generatedAt", paid_at AS "paidAt"
        FROM invoices WHERE id = $1`,
       [id]
@@ -77,29 +77,50 @@ export async function downloadInvoicePdf(req: AuthenticatedRequest, res: Respons
     }
 
     const inv = result.rows[0];
+    const ref = inv.reference ?? inv.id.slice(0, 8).toUpperCase();
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="invoice-${id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${ref}.pdf"`);
 
-    const doc = new PDFDocument({ margin: 50 });
+    const doc = new PDFDocument({ margin: 50, size: 'A4' });
     doc.pipe(res);
 
+    // Header
     doc.fontSize(22).font('Helvetica-Bold').text('TRANSVIREX', { align: 'right' });
-    doc.fontSize(14).font('Helvetica').text('Facture / Invoice', { align: 'right' });
-    doc.moveDown(2);
+    doc.fontSize(11).font('Helvetica').fillColor('#888888').text('Logistique & Transport', { align: 'right' });
+    doc.fillColor('#000000').moveDown(0.5);
 
-    doc.fontSize(11).font('Helvetica-Bold').text(`Numéro: ${inv.id}`);
-    doc.font('Helvetica').text(`Client: ${inv.clientName}`);
-    doc.text(`Mission: ${inv.missionId}`);
-    doc.text(`Date: ${new Date(inv.generatedAt).toLocaleDateString('fr-FR')}`);
-    doc.text(`Statut: ${inv.status}`);
-    if (inv.paidAt) doc.text(`Payé le: ${new Date(inv.paidAt).toLocaleDateString('fr-FR')}`);
-    doc.moveDown();
+    // Reference badge (large, prominent)
+    doc.fontSize(18).font('Helvetica-Bold').text(ref, { align: 'left' });
+    doc.fontSize(10).font('Helvetica').fillColor('#888888').text('Référence facture', { align: 'left' });
+    doc.fillColor('#000000').moveDown(1.5);
 
-    doc.moveTo(50, doc.y).lineTo(550, doc.y).stroke();
-    doc.moveDown();
+    // Separator
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke('#cccccc');
+    doc.moveDown(0.8);
 
-    doc.fontSize(14).font('Helvetica-Bold').text(`Montant total: ${Number(inv.amount).toFixed(2)} €`, { align: 'right' });
+    // Body
+    doc.fontSize(11).font('Helvetica-Bold').text('Client :', { continued: true }).font('Helvetica').text(` ${inv.clientName}`);
+    doc.font('Helvetica-Bold').text('Mission :', { continued: true }).font('Helvetica').text(` ${inv.missionId}`);
+    doc.font('Helvetica-Bold').text('Date d\'émission :', { continued: true }).font('Helvetica').text(` ${new Date(inv.generatedAt).toLocaleDateString('fr-FR')}`);
+    doc.font('Helvetica-Bold').text('Statut :', { continued: true }).font('Helvetica').text(` ${inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}`);
+    if (inv.paidAt) {
+      doc.font('Helvetica-Bold').text('Payé le :', { continued: true }).font('Helvetica').text(` ${new Date(inv.paidAt).toLocaleDateString('fr-FR')}`);
+    }
+    doc.moveDown(1.5);
+
+    // Amount
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(1).stroke('#cccccc');
+    doc.moveDown(0.8);
+    doc.fontSize(14).font('Helvetica-Bold').text(`Montant total : ${Number(inv.amount).toLocaleString('fr-FR')} DZD`, { align: 'right' });
+    doc.moveDown(3);
+
+    // Footer — sequence reference
+    doc.moveTo(50, doc.y).lineTo(545, doc.y).lineWidth(0.5).stroke('#dddddd');
+    doc.moveDown(0.5);
+    doc.fontSize(8).font('Helvetica').fillColor('#aaaaaa')
+      .text(`Référence séquentielle : ${ref}  ·  ID système : ${inv.id}`, { align: 'center' })
+      .text('Transvirex — Document généré automatiquement', { align: 'center' });
 
     doc.end();
   } catch (err) {
@@ -126,9 +147,11 @@ export async function createInvoice(req: AuthenticatedRequest, res: Response): P
     }
 
     const result = await pool.query(
-      `INSERT INTO invoices (mission_id, client_name, amount, created_by)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, mission_id AS "missionId", client_name AS "clientName",
+      `INSERT INTO invoices (mission_id, client_name, amount, created_by, reference)
+       VALUES ($1, $2, $3, $4,
+         'FAC-' || TO_CHAR(NOW(), 'YYYY') || '-' || LPAD(nextval('invoice_seq')::text, 4, '0')
+       )
+       RETURNING id, reference, mission_id AS "missionId", client_name AS "clientName",
                  amount, status, generated_at AS "generatedAt", paid_at AS "paidAt"`,
       [missionId, clientName, amount, req.user!.userId]
     );
@@ -188,7 +211,7 @@ export async function updateInvoiceStatus(req: AuthenticatedRequest, res: Respon
       `UPDATE invoices
        SET status = $1, paid_at = COALESCE($2, paid_at)
        WHERE id = $3
-       RETURNING id, mission_id AS "missionId", client_name AS "clientName",
+       RETURNING id, reference, mission_id AS "missionId", client_name AS "clientName",
                  amount, status, generated_at AS "generatedAt", paid_at AS "paidAt"`,
       [status, paidAt, id]
     );
@@ -281,6 +304,101 @@ export async function recordPayment(req: AuthenticatedRequest, res: Response): P
   } catch (err) {
     console.error('[billing] recordPayment error:', err);
     res.status(500).json(createError('INTERNAL_ERROR', 'Failed to record payment'));
+  }
+}
+
+// ── GET /billing/sla ─────────────────────────────────────────────────────────
+export async function getSlaStats(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const [mainRes, overdueRes] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*) FILTER (WHERE status = 'paid') AS "paidCount",
+          COUNT(*) FILTER (
+            WHERE status = 'paid'
+            AND EXTRACT(EPOCH FROM (paid_at - generated_at)) / 86400 <= 30
+          ) AS "paidOnTimeCount",
+
+          COUNT(*) FILTER (WHERE status = 'sent') AS "overdueCount",
+          COALESCE(SUM(amount) FILTER (WHERE status = 'sent'), 0) AS "overdueAmount",
+
+          COUNT(*) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 <= 30
+          ) AS "a0_30Count",
+          COALESCE(SUM(amount) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 <= 30
+          ), 0) AS "a0_30Amount",
+
+          COUNT(*) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 > 30
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 <= 60
+          ) AS "a31_60Count",
+          COALESCE(SUM(amount) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 > 30
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 <= 60
+          ), 0) AS "a31_60Amount",
+
+          COUNT(*) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 > 60
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 <= 90
+          ) AS "a61_90Count",
+          COALESCE(SUM(amount) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 > 60
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 <= 90
+          ), 0) AS "a61_90Amount",
+
+          COUNT(*) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 > 90
+          ) AS "a90pCount",
+          COALESCE(SUM(amount) FILTER (
+            WHERE status = 'sent'
+            AND EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400 > 90
+          ), 0) AS "a90pAmount",
+
+          COALESCE(AVG(
+            EXTRACT(EPOCH FROM (paid_at - generated_at)) / 86400
+          ) FILTER (WHERE status = 'paid'), 0) AS "avgDaysToPay"
+        FROM invoices
+      `),
+      pool.query(`
+        SELECT id, reference, client_name AS "clientName", amount,
+               generated_at AS "generatedAt",
+               ROUND(EXTRACT(EPOCH FROM (NOW() - generated_at)) / 86400)::int AS "daysOld"
+        FROM invoices
+        WHERE status = 'sent'
+        ORDER BY generated_at ASC
+      `),
+    ]);
+
+    const r = mainRes.rows[0];
+    const paidCount = parseInt(r.paidCount, 10);
+    const paidOnTime = parseInt(r.paidOnTimeCount, 10);
+
+    res.json(createSuccess({
+      slaRate:        paidCount === 0 ? 100 : Math.round((paidOnTime / paidCount) * 100),
+      paidCount,
+      paidOnTimeCount: paidOnTime,
+      overdueCount:   parseInt(r.overdueCount, 10),
+      overdueAmount:  r.overdueAmount,
+      avgDaysToPay:   parseFloat(parseFloat(r.avgDaysToPay).toFixed(1)),
+      aging: {
+        '0_30':  { count: parseInt(r.a0_30Count,  10), amount: r.a0_30Amount  },
+        '31_60': { count: parseInt(r.a31_60Count, 10), amount: r.a31_60Amount },
+        '61_90': { count: parseInt(r.a61_90Count, 10), amount: r.a61_90Amount },
+        '90plus':{ count: parseInt(r.a90pCount,   10), amount: r.a90pAmount   },
+      },
+      overdueInvoices: overdueRes.rows,
+    }));
+  } catch (err) {
+    console.error('[billing] getSlaStats error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to fetch SLA stats'));
   }
 }
 
