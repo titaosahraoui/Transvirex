@@ -27,10 +27,12 @@ const PIE_COLORS = ['var(--ink-3)', 'var(--hi)', 'var(--accent)', 'var(--good)',
 const mgmtNav = [
   'PERFORMANCE',
   { key: 'dash',  icon: '📊', label: 'Tableau de bord', path: '/dashboard' },
-  { key: 'sla',   icon: '⏱',  label: 'SLA & délais' },
+  { key: 'sla',   icon: '⏱',  label: 'SLA & délais', path: '/sla' },
   'FLOTTE',
   { key: 'drv',   icon: '🚐', label: 'Chauffeurs', path: '/drivers' },
-  { key: 'geo',   icon: '🗺',  label: 'Géographie' },
+  { key: 'geo',   icon: '🗺',  label: 'Géographie', path: '/geo' },
+  'ADMINISTRATION',
+  { key: 'team', icon: '👥', label: 'Équipe',       path: '/team' },
 ];
 
 export default function DashboardPage() {
@@ -90,7 +92,7 @@ export default function DashboardPage() {
       </aside>
 
       {/* Main */}
-      <div className="wf-shell-main">
+      <main className="wf-shell-main">
         <div className="wf-appbar">
           <span className="bar-crumbs">Direction / Tableau de bord</span>
           <div className="bar-actions">
@@ -204,7 +206,7 @@ export default function DashboardPage() {
             </table>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

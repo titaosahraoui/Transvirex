@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -9,23 +10,28 @@ import MissionDetailPage from './pages/MissionDetailPage';
 import DriversPage from './pages/DriversPage';
 import PlanningPage from './pages/PlanningPage';
 import AlertsPage from './pages/AlertsPage';
+import ChatPage from './pages/ChatPage';
 
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/board" element={<ProtectedRoute><BoardPage /></ProtectedRoute>} />
-          <Route path="/missions/new" element={<ProtectedRoute><NewMissionPage /></ProtectedRoute>} />
-          <Route path="/missions/:id" element={<ProtectedRoute><MissionDetailPage /></ProtectedRoute>} />
-          <Route path="/drivers" element={<ProtectedRoute><DriversPage /></ProtectedRoute>} />
-          <Route path="/planning" element={<ProtectedRoute><PlanningPage /></ProtectedRoute>} />
-          <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
-          <Route path="/" element={<Navigate to="/board" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <NotificationProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/board" element={<ProtectedRoute><BoardPage /></ProtectedRoute>} />
+            <Route path="/missions/new" element={<ProtectedRoute><NewMissionPage /></ProtectedRoute>} />
+            <Route path="/missions/:id" element={<ProtectedRoute><MissionDetailPage /></ProtectedRoute>} />
+            <Route path="/drivers" element={<ProtectedRoute><DriversPage /></ProtectedRoute>} />
+            <Route path="/planning" element={<ProtectedRoute><PlanningPage /></ProtectedRoute>} />
+            <Route path="/alerts" element={<ProtectedRoute><AlertsPage /></ProtectedRoute>} />
+            <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+            <Route path="/chat/:driverId" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+            <Route path="/" element={<Navigate to="/board" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

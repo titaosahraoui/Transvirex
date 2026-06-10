@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
-import { useSocket } from '../hooks/useSocket';
+import { useNotification } from '../context/NotificationContext';
 import { dispatchNav } from '../lib/dispatchNav';
 
 interface Mission {
@@ -38,9 +38,9 @@ const STATUS_ICON: Record<string, string> = {
 };
 
 export default function AlertsPage() {
-  const { user, logout, token } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const socketRef = useSocket(token);
+  const { socket } = useNotification();
   const [incidents, setIncidents] = useState<Mission[]>([]);
   const [overdue, setOverdue]     = useState<Mission[]>([]);
   const [feed, setFeed]           = useState<FeedEvent[]>([]);
@@ -70,7 +70,6 @@ export default function AlertsPage() {
 
   // Live feed via socket
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket) return;
     const handler = (data: { missionId?: string; status?: string }) => {
       if (!data.missionId || !data.status) return;
@@ -81,7 +80,7 @@ export default function AlertsPage() {
     };
     socket.on('mission:status', handler);
     return () => { socket.off('mission:status', handler); };
-  }, [socketRef.current]);
+  }, [socket]);
 
   const sla = stats?.slaPercent ?? 100;
 

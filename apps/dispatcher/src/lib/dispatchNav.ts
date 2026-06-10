@@ -9,6 +9,7 @@ export const dispatchNav: NavItem[] = [
   { key: 'alert', icon: '⚠',  label: 'Alertes',            path: '/alerts' },
   'RÉSEAU',
   { key: 'drv',   icon: '🚐', label: 'Chauffeurs',         path: '/drivers' },
+  { key: 'chat',  icon: '💬', label: 'Messagerie',          path: '/chat'    },
   'ACTIONS',
   { key: 'new',   icon: '＋', label: 'Nouvelle mission',   path: '/missions/new' },
 ];

@@ -11,6 +11,7 @@ const billingNav = [
   'FACTURATION',
   { key: 'inv',   icon: '🧾', label: 'Factures',     path: '/invoices' },
   { key: 'stats', icon: '📊', label: 'Statistiques', path: '/stats' },
+  { key: 'sla',   icon: '⏱',  label: 'SLA & Délais', path: '/sla' },
   'PARAMÈTRES',
   { key: 'set',   icon: '⚙',  label: 'Paramètres' },
 ];
@@ -62,7 +63,7 @@ export default function StatsPage() {
       </aside>
 
       {/* Main */}
-      <div className="wf-shell-main">
+      <main className="wf-shell-main">
         <div className="wf-appbar">
           <span className="bar-crumbs">Facturation / Statistiques</span>
         </div>
@@ -178,7 +179,7 @@ export default function StatsPage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }

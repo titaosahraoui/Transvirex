@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, useAuth } from '../context/AuthContext';
-import { useSocket } from '../hooks/useSocket';
+import { api } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 import { dispatchNav } from '../lib/dispatchNav';
 import { MapContainer, TileLayer, Marker, Polyline, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -56,8 +56,7 @@ const driverIcon  = L.divIcon({ className: '', html: '🚐', iconSize: [28, 28],
 export default function MissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = useAuth();
-  const socketRef = useSocket(token);
+  const { socket } = useNotification();
 
   const [mission, setMission]           = useState<Mission | null>(null);
   const [suggestions, setSuggestions]   = useState<Suggestion[]>([]);
@@ -105,7 +104,6 @@ export default function MissionDetailPage() {
 
   // Real-time GPS pings from driver
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket) return;
     const handler = (data: { missionId: string; lat: number; lng: number }) => {
       if (data.missionId !== id) return;
@@ -114,7 +112,7 @@ export default function MissionDetailPage() {
     };
     socket.on('driver:location', handler);
     return () => { socket.off('driver:location', handler); };
-  }, [socketRef.current, id]);
+  }, [socket, id]);
 
   // Age counter for GPS freshness
   useEffect(() => {

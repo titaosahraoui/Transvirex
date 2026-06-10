@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
+import { useNotification } from '../context/NotificationContext';
 
 interface Invoice {
-  id: string; missionId: string; clientName: string;
+  id: string; reference?: string; missionId: string; clientName: string;
   amount: string; status: string; generatedAt: string; paidAt: string | null;
 }
 interface Payment {
@@ -20,6 +21,7 @@ const billingNav = [
   'FACTURATION',
   { key: 'inv',   icon: '🧾', label: 'Factures',     path: '/invoices' },
   { key: 'stats', icon: '📊', label: 'Statistiques', path: '/stats' },
+  { key: 'sla',   icon: '⏱',  label: 'SLA & Délais', path: '/sla' },
   'PARAMÈTRES',
   { key: 'set',   icon: '⚙',  label: 'Paramètres' },
 ];
@@ -28,6 +30,7 @@ export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { socket } = useNotification();
   const [invoice, setInvoice]   = useState<Invoice | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -55,6 +58,22 @@ export default function InvoiceDetailPage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Socket-driven auto-refresh
+  useEffect(() => {
+    if (!socket) return;
+    const onPaid = (data: { invoiceId: string }) => {
+      if (data.invoiceId === id) {
+        api.get(`/billing/invoices/${id}`).then(r => setInvoice(r.data.data)).catch(() => {});
+      }
+    };
+    const onPayment = (data: { invoiceId: string }) => {
+      if (data.invoiceId === id) loadPayments();
+    };
+    socket.on('invoice:paid', onPaid);
+    socket.on('payment:recorded', onPayment);
+    return () => { socket.off('invoice:paid', onPaid); socket.off('payment:recorded', onPayment); };
+  }, [socket, id, loadPayments]);
+
   async function markStatus(status: string) {
     if (!invoice) return;
     setUpdating(true); setError('');
@@ -78,6 +97,18 @@ export default function InvoiceDetailPage() {
       setPayForm(prev => ({ ...prev, amount: '' }));
     } catch { setError("Impossible d'enregistrer le paiement"); }
     finally { setRecording(false); }
+  }
+
+  async function downloadPdf() {
+    try {
+      const response = await api.get(`/billing/invoices/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `facture-${id?.slice(0, 8)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch { console.error('PDF download failed'); }
   }
 
   const totalPaid = payments.reduce((s, p) => s + parseFloat(p.amount), 0);
@@ -120,7 +151,7 @@ export default function InvoiceDetailPage() {
       </aside>
 
       {/* Main */}
-      <div className="wf-shell-main">
+      <main className="wf-shell-main">
         <div className="wf-appbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span className="mono muted" style={{ cursor: 'pointer', fontSize: 11 }} onClick={() => navigate('/invoices')}>
@@ -130,6 +161,7 @@ export default function InvoiceDetailPage() {
           </div>
           <div className="bar-actions">
             <span className={`wf-pill ${STATUS_PILL[invoice.status]}`}>{statusLabel}</span>
+            <button className="wf-btn sm" onClick={downloadPdf}>⬇ PDF</button>
             {invoice.status === 'draft' && (
               <button className="wf-btn warn sm" disabled={updating} onClick={() => markStatus('sent')}>
                 {updating ? '…' : '📤 Envoyer'}
@@ -151,8 +183,15 @@ export default function InvoiceDetailPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
                 <div className="script" style={{ fontSize: 28, lineHeight: 1 }}>{invoice.clientName}</div>
-                <div className="mono muted" style={{ fontSize: 10.5, marginTop: 2 }}>
-                  Facture {invoice.id.slice(0, 8)} · {statusLabel}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                  {invoice.reference && (
+                    <span className="mono" style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', letterSpacing: '.04em' }}>
+                      {invoice.reference}
+                    </span>
+                  )}
+                  <span className="mono muted" style={{ fontSize: 10.5 }}>
+                    · {statusLabel}
+                  </span>
                 </div>
               </div>
 
@@ -187,9 +226,9 @@ export default function InvoiceDetailPage() {
                 </div>
                 <div style={{ borderLeft: '2px dashed var(--ink)', paddingLeft: 12, marginLeft: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {[
-                    { label: 'Facture créée',   done: true },
+                    { label: 'Facture créée',     done: true },
                     { label: 'Envoyée au client', done: ['sent', 'paid'].includes(invoice.status) },
-                    { label: 'Paiement reçu',   done: invoice.status === 'paid' },
+                    { label: 'Paiement reçu',     done: invoice.status === 'paid' },
                   ].map((step, i) => (
                     <div key={i} className="wf-row" style={{ padding: '6px 10px', gap: 8 }}>
                       <div className="wf-row-lead" style={{ width: 28, height: 28, fontSize: 13 }}>
@@ -213,7 +252,6 @@ export default function InvoiceDetailPage() {
                 <div className="mono muted" style={{ fontSize: 10, marginTop: 2 }}>
                   sur {amount.toLocaleString('fr-FR')} DZD
                 </div>
-                {/* Remaining bar */}
                 <div style={{ height: 5, background: 'var(--paper-2)', borderRadius: 3, overflow: 'hidden', marginTop: 8, border: '1px solid var(--ink-3)' }}>
                   <div style={{
                     width: `${Math.min(100, (totalPaid / amount) * 100)}%`,
@@ -230,9 +268,7 @@ export default function InvoiceDetailPage() {
                     <div>
                       <label className="mono muted" style={{ fontSize: 10, display: 'block', marginBottom: 3 }}>Montant (DZD)</label>
                       <input
-                        type="number"
-                        className="wf-inp"
-                        style={{ width: '100%' }}
+                        type="number" className="wf-inp" style={{ width: '100%' }}
                         value={payForm.amount}
                         onChange={e => setPayForm(p => ({ ...p, amount: e.target.value }))}
                         placeholder="0"
@@ -241,8 +277,7 @@ export default function InvoiceDetailPage() {
                     <div>
                       <label className="mono muted" style={{ fontSize: 10, display: 'block', marginBottom: 3 }}>Mode de paiement</label>
                       <select
-                        className="wf-inp"
-                        style={{ width: '100%' }}
+                        className="wf-inp" style={{ width: '100%' }}
                         value={payForm.method}
                         onChange={e => setPayForm(p => ({ ...p, method: e.target.value }))}
                       >
@@ -253,10 +288,8 @@ export default function InvoiceDetailPage() {
                       </select>
                     </div>
                     <button
-                      className="wf-btn good"
-                      disabled={recording || !payForm.amount}
-                      onClick={recordPayment}
-                      style={{ width: '100%', marginTop: 4 }}
+                      className="wf-btn good" disabled={recording || !payForm.amount}
+                      onClick={recordPayment} style={{ width: '100%', marginTop: 4 }}
                     >
                       {recording ? 'Enregistrement…' : '✓ Enregistrer'}
                     </button>
@@ -293,7 +326,7 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

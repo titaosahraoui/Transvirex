@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, api } from '../context/AuthContext';
-import { useSocket } from '../hooks/useSocket';
+import { useNotification } from '../context/NotificationContext';
 
 interface Mission {
   id: string; clientName: string; pickupAddress: string;
@@ -17,9 +17,9 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 export default function MissionsPage() {
-  const { user, logout, token } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const socketRef = useSocket(token);
+  const { socket } = useNotification();
   const [missions, setMissions]     = useState<Mission[]>([]);
   const [loading, setLoading]       = useState(true);
   const [filter, setFilter]         = useState('all');
@@ -43,7 +43,6 @@ export default function MissionsPage() {
 
   // Real-time: receive assignment notification from dispatcher
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket) return;
     const assignHandler = (data: { clientName?: string }) => {
       load();
@@ -63,7 +62,7 @@ export default function MissionsPage() {
       socket.off('mission:assigned', assignHandler);
       socket.off('mission:status', statusHandler);
     };
-  }, [socketRef.current, load]);
+  }, [socket, load]);
 
   const filters = [
     { key: 'all',         label: 'Toutes' },
