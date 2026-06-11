@@ -14,7 +14,8 @@ x-mongo: &mongo
 services:
   # ── Databases ──────────────────────────────────────────────────────────────
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
+    platform: linux/amd64
     restart: unless-stopped
     environment:
       POSTGRES_DB: transvirex
@@ -32,6 +33,7 @@ services:
 
   mongodb:
     image: mongo:7
+    platform: linux/amd64
     restart: unless-stopped
     ports:
       - "27017:27017"
@@ -86,6 +88,8 @@ services:
     environment:
       <<: [*pg, *mongo]
       PORT: 4002
+      AUTH_SERVICE_URL: http://auth-svc:4001
+      BILLING_SERVICE_URL: http://billing-svc:4003
       NOTIFICATION_SERVICE_URL: http://notification-svc:4005
     depends_on:
       postgres:
@@ -118,6 +122,7 @@ services:
       PORT: 4004
       AUTH_SERVICE_URL: http://auth-svc:4001
       MISSION_SERVICE_URL: http://mission-svc:4002
+      HF_TOKEN: ${HF_TOKEN:-}
 
   notification-svc:
     build:
@@ -132,6 +137,46 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+
+  driver-app:
+    build:
+      context: .
+      dockerfile: apps/driver/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - gateway
+
+  dispatcher-app:
+    build:
+      context: .
+      dockerfile: apps/dispatcher/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    depends_on:
+      - gateway
+
+  billing-app:
+    build:
+      context: .
+      dockerfile: apps/billing/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3003:80"
+    depends_on:
+      - gateway
+
+  management-app:
+    build:
+      context: .
+      dockerfile: apps/management/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - gateway
 
 volumes:
   postgres_data:

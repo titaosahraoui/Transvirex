@@ -4,6 +4,7 @@ import {
   getDriverById,
   getDriverByUserId,
   updateDriver,
+  updateDriverLoad,
   getUserById,
 } from '../controllers/user.controller';
 
@@ -13,6 +14,7 @@ const router = Router();
 router.get('/drivers',                    getDrivers);
 router.get('/drivers/by-user/:userId',    getDriverByUserId);
 router.get('/drivers/:id',               getDriverById);
+router.patch('/drivers/:id/load',        updateDriverLoad);
 router.patch('/drivers/:id',             updateDriver);
 
 // User lookup (called internally)

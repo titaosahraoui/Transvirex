@@ -17,7 +17,74 @@ interface Mission {
 }
 interface Suggestion {
   driverId: string; name: string; score: number;
-  features: { distanceKm: number; currentLoad: number; acceptanceRate: number };
+  features: {
+    distanceKm: number; currentLoad: number; acceptanceRate: number;
+    experienceDays: number; missionUrgency: number; timeOfDayScore: number;
+    zoneMatch: number;
+  };
+  explanation?: string;
+}
+
+function scoreColor(s: number) {
+  return s >= 0.75 ? 'var(--good)' : s >= 0.5 ? 'var(--accent)' : 'var(--bad)';
+}
+
+function SuggestionCard({ s, rank, actionLabel, disabled, onAction }: {
+  s: Suggestion; rank: number; actionLabel: string; disabled: boolean; onAction: () => void;
+}) {
+  const color = scoreColor(s.score);
+  return (
+    <div className="wf-box solid" style={{ display: 'flex', flexDirection: 'column', gap: 7, padding: '10px 12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 8, border: '1.5px solid var(--ink)',
+          background: rank === 0 ? 'var(--hi)' : '#f5f0e8', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 700,
+        }}>
+          {rank === 0 ? '★' : `#${rank + 1}`}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            <b style={{ fontSize: 13, fontWeight: 700 }}>{s.name}</b>
+            {rank === 0 && <span className="wf-pill fill" style={{ fontSize: 9, padding: '0 6px' }}>TOP</span>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 700, color }}>
+            {(s.score * 100).toFixed(0)}%
+          </span>
+          <div style={{ width: 52, height: 3, background: '#e5e0d8', borderRadius: 3, overflow: 'hidden' }}>
+            <div style={{ width: `${s.score * 100}%`, height: '100%', background: color, borderRadius: 3 }} />
+          </div>
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <span className="wf-pill" style={{ fontSize: 9.5, padding: '1px 6px' }}>📍 {s.features.distanceKm.toFixed(1)} km</span>
+        <span className="wf-pill" style={{ fontSize: 9.5, padding: '1px 6px' }}>📦 {s.features.currentLoad} mission{s.features.currentLoad !== 1 ? 's' : ''}</span>
+        <span className="wf-pill" style={{ fontSize: 9.5, padding: '1px 6px' }}>⭐ {s.features.acceptanceRate.toFixed(0)}% fiab.</span>
+        {s.features.zoneMatch === 1 && (
+          <span className="wf-pill good" style={{ fontSize: 9.5, padding: '1px 6px' }}>✅ Même zone</span>
+        )}
+        {s.features.experienceDays > 30 && (
+          <span className="wf-pill" style={{ fontSize: 9.5, padding: '1px 6px' }}>👤 {s.features.experienceDays}j exp.</span>
+        )}
+      </div>
+      {s.explanation && (
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)',
+          fontStyle: 'italic', paddingLeft: 8, borderLeft: '2.5px solid var(--hi)',
+        }}>
+          {s.explanation}
+        </div>
+      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="wf-btn sm good" disabled={disabled} onClick={onAction}>
+          {actionLabel}
+        </button>
+      </div>
+    </div>
+  );
 }
 interface Driver { id: string; name: string; status: string; }
 interface DriverDetail { id: string; name: string; status: string; vehicleType: string; }
@@ -463,25 +530,15 @@ export default function MissionDetailPage() {
                   </div>
 
                   {suggestions.length > 0 && (
-                    <div style={{ marginBottom: 12 }}>
+                    <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {suggestions.map((s, i) => (
-                        <div key={s.driverId} className="wf-row solid" style={{ marginTop: i ? 6 : 0, gap: 8 }}>
-                          <div className="wf-row-lead" style={{ background: i === 0 ? 'var(--hi)' : '#fff5d6' }}>
-                            {i === 0 ? '★' : s.name[0]}
-                          </div>
-                          <div className="wf-row-main">
-                            <b>{s.name}</b>
-                            <small>{s.features.distanceKm.toFixed(1)} km · charge {s.features.currentLoad}</small>
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                            <span className="mono" style={{ fontSize: 11, fontWeight: 700 }}>
-                              {(s.score * 100).toFixed(0)}%
-                            </span>
-                            <button className="wf-btn sm good" disabled={assigning} onClick={() => assignDriver(s.driverId)}>
-                              Assigner
-                            </button>
-                          </div>
-                        </div>
+                        <SuggestionCard
+                          key={s.driverId}
+                          s={s} rank={i}
+                          actionLabel="Assigner"
+                          disabled={assigning}
+                          onAction={() => assignDriver(s.driverId)}
+                        />
                       ))}
                     </div>
                   )}
@@ -539,20 +596,15 @@ export default function MissionDetailPage() {
                         </button>
                       </div>
                       {suggestions.length > 0 && (
-                        <div style={{ marginBottom: 10 }}>
+                        <div style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
                           {suggestions.map((s, i) => (
-                            <div key={s.driverId} className="wf-row solid" style={{ marginTop: i ? 5 : 0, gap: 8 }}>
-                              <div className="wf-row-lead" style={{ background: i === 0 ? 'var(--hi)' : '#fff5d6' }}>
-                                {i === 0 ? '★' : s.name[0]}
-                              </div>
-                              <div className="wf-row-main">
-                                <b>{s.name}</b>
-                                <small>{s.features.distanceKm.toFixed(1)} km</small>
-                              </div>
-                              <button className="wf-btn sm good" disabled={reassigning} onClick={() => reassignDriver(s.driverId)}>
-                                Réassigner
-                              </button>
-                            </div>
+                            <SuggestionCard
+                              key={s.driverId}
+                              s={s} rank={i}
+                              actionLabel="Réassigner"
+                              disabled={reassigning}
+                              onAction={() => reassignDriver(s.driverId)}
+                            />
                           ))}
                         </div>
                       )}

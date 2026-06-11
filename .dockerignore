@@ -4,4 +4,4 @@
 **/.turbo
 **/coverage
 **/*.log
-apps
+**/*.tsbuildinfo
