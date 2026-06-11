@@ -189,6 +189,9 @@ export async function assignMission(req: AuthenticatedRequest, res: Response): P
     const mission = result.rows[0];
     res.json(createSuccess(mission));
 
+    // Increment driver's active mission count
+    axios.patch(`${AUTH_URL}/drivers/${driverId}/load`, { delta: 1 }).catch(console.error);
+
     Promise.resolve().then(async () => {
       try {
         const driverRes = await axios.get(`${AUTH_URL}/drivers/${driverId}`, {
@@ -244,6 +247,11 @@ export async function cancelMission(req: AuthenticatedRequest, res: Response): P
     );
 
     res.json(createSuccess(result.rows[0]));
+
+    // Decrement load if the cancelled mission had an assigned driver
+    if (driverId && currentStatus === 'assigned') {
+      axios.patch(`${AUTH_URL}/drivers/${driverId}/load`, { delta: -1 }).catch(console.error);
+    }
 
     Promise.resolve().then(async () => {
       try {
@@ -339,6 +347,16 @@ export async function updateMissionStatus(
 
     res.json(createSuccess(result.rows[0]));
 
+    // Sync driver current_load when mission ends or driver is unassigned
+    if (currentDriverId) {
+      if (['completed', 'failed'].includes(status)) {
+        axios.patch(`${AUTH_URL}/drivers/${currentDriverId}/load`, { delta: -1 }).catch(console.error);
+      } else if (status === 'pending') {
+        // assigned → pending: driver was unassigned
+        axios.patch(`${AUTH_URL}/drivers/${currentDriverId}/load`, { delta: -1 }).catch(console.error);
+      }
+    }
+
     notifyUser('mission:status', createdBy, { missionId: id, status, driverId: currentDriverId, notes });
 
     if (status === 'completed') {
@@ -396,7 +414,8 @@ export async function updateDriverLocation(
       return;
     }
 
-    const createdBy: string = missionRes.rows[0].created_by;
+    const createdBy: string  = missionRes.rows[0].created_by;
+    const driverId:  string  = missionRes.rows[0].driver_id;
 
     Promise.resolve(
       DeliveryEvent.create({
@@ -406,6 +425,11 @@ export async function updateDriverLocation(
     ).catch((err: unknown) => console.error('[mission] location DeliveryEvent save failed:', err));
 
     notifyUser('driver:location', createdBy, { missionId: id, driverId: req.user!.userId, lat, lng });
+
+    // Persist driver lat/lng to PostgreSQL so the AI service gets accurate distances
+    if (driverId) {
+      axios.patch(`${AUTH_URL}/drivers/${driverId}`, { lat, lng }).catch(console.error);
+    }
 
     res.json(createSuccess({ missionId: id, lat, lng }));
   } catch (err) {
@@ -530,6 +554,12 @@ export async function reassignMission(req: AuthenticatedRequest, res: Response):
     const mission = result.rows[0];
     res.json(createSuccess(mission));
 
+    // Swap load counts: old driver freed, new driver gains a mission
+    if (oldDriverId) {
+      axios.patch(`${AUTH_URL}/drivers/${oldDriverId}/load`, { delta: -1 }).catch(console.error);
+    }
+    axios.patch(`${AUTH_URL}/drivers/${newDriverId}/load`, { delta: 1 }).catch(console.error);
+
     const headers = {
       'x-user-id':    req.user!.userId,
       'x-user-role':  req.user!.role,
@@ -634,6 +664,9 @@ export async function rejectMission(req: AuthenticatedRequest, res: Response): P
     );
 
     res.json(createSuccess(result.rows[0]));
+
+    // Decrement driver load since they returned the mission
+    axios.patch(`${AUTH_URL}/drivers/${driverId}/load`, { delta: -1 }).catch(console.error);
 
     Promise.resolve().then(async () => {
       try {

@@ -2,6 +2,11 @@
 
 Transvirex is a logistics and transport management platform. Dispatchers create delivery missions, assign drivers, track them in real time, and billing staff invoice clients — all through role-specific web apps backed by microservices.
 
+## Documents projet (FR)
+
+- [**README** (racine)](../README.md) — support de soutenance : contexte, choix techniques, architecture, sécurité, conteneurisation, modules ERP, utilisateurs, agentique IA.
+- [**Livrable**](./livrable.md) — rapport : analyse du besoin, user stories, architecture initiale, organisation, planification, wireframes, démarche projet.
+
 ## Monorepo layout
 
 | Component | Directory | Port | Role |

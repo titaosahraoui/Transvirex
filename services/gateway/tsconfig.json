@@ -6,7 +6,9 @@
     "baseUrl": ".",
     "paths": {
       "@transvirex/shared": ["../../packages/shared/dist/index"]
-    }
+    },
+    "declaration": false,
+    "declarationMap": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

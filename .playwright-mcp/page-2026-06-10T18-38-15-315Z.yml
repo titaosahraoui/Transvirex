@@ -1,0 +1,16 @@
+- generic [ref=e4]:
+  - generic [ref=e5]: transvirex.
+  - generic [ref=e6]: Dispatcher · Hub opérations
+  - generic [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e9]: Email
+      - textbox "dispatcher@transvirex.fr" [ref=e10]
+    - generic [ref=e11]:
+      - generic [ref=e12]: Mot de passe
+      - textbox "••••••••" [ref=e13]
+    - button "Se connecter" [ref=e14] [cursor=pointer]
+  - separator [ref=e15]
+  - paragraph [ref=e16]:
+    - text: Pas encore de compte ?
+    - link "Créer un compte" [ref=e17] [cursor=pointer]:
+      - /url: /register

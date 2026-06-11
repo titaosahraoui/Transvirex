@@ -3,6 +3,7 @@ import axios from 'axios';
 import { createSuccess, createError } from '@transvirex/shared';
 import { AuthenticatedRequest } from '../middleware/requireUser';
 import { scoreDrivers, DriverFeatures } from '../ml/model';
+import { explainMatch } from '../ml/hf';
 
 const AUTH_SVC    = process.env.AUTH_SERVICE_URL    ?? 'http://localhost:4001';
 const MISSION_SVC = process.env.MISSION_SERVICE_URL ?? 'http://localhost:4002';
@@ -110,12 +111,30 @@ export async function suggestAssignment(
         zoneMatch:      0, // zone matching is simplified for now
       }));
 
-    const suggestions = await scoreDrivers(driverFeatures);
+    const ranked = await scoreDrivers(driverFeatures);
+    const top5 = ranked.slice(0, 5);
+
+    const suggestions = await Promise.all(
+      top5.map(async (d) => ({
+        driverId:    d.driverId,
+        name:        d.name,
+        score:       d.score,
+        features:    d.features,
+        explanation: await explainMatch({
+          name:           d.name,
+          distanceKm:     d.features.distanceKm,
+          currentLoad:    d.features.currentLoad,
+          acceptanceRate: d.features.acceptanceRate,
+          zoneMatch:      !!d.features.zoneMatch,
+          score:          d.score,
+        }),
+      }))
+    );
 
     res.json(
       createSuccess({
         missionId,
-        suggestions: suggestions.slice(0, 5), // top 5
+        suggestions,
       })
     );
   } catch (err) {

@@ -116,6 +116,22 @@ export async function updateDriver(req: Request, res: Response): Promise<void> {
   }
 }
 
+// PATCH /drivers/:id/load — atomic increment/decrement of current_load
+export async function updateDriverLoad(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const delta = Number(req.body.delta ?? 0);
+    await pool.query(
+      `UPDATE drivers SET current_load = GREATEST(0, current_load + $1) WHERE id = $2`,
+      [delta, id]
+    );
+    res.json(createSuccess({ ok: true }));
+  } catch (err) {
+    console.error('[auth] updateDriverLoad error:', err);
+    res.status(500).json(createError('INTERNAL_ERROR', 'Failed to update driver load'));
+  }
+}
+
 // GET /users/:id
 export async function getUserById(req: Request, res: Response): Promise<void> {
   try {
