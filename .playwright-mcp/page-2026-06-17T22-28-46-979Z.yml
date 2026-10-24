@@ -1,0 +1,638 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - generic [ref=e6]: transvirex.
+      - generic [ref=e7]: wireframes · plateforme logistique · v0.1 · 23 mai 2026
+    - tablist [ref=e8]:
+      - tab "✶Vue d'ensemble" [ref=e9] [cursor=pointer]
+      - tab "📱Mobile Driver" [selected] [ref=e10] [cursor=pointer]
+      - tab "🎛Web Dispatcher" [ref=e11] [cursor=pointer]
+      - tab "📊Web Dashboard" [ref=e12] [cursor=pointer]
+      - tab "⚙Web Admin" [ref=e13] [cursor=pointer]
+  - main [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - heading "Mobile Driver" [level=1] [ref=e17]:
+          - text: Mobile
+          - text: Driver
+        - generic [ref=e18]:
+          - paragraph [ref=e19]: "App chauffeur (React Native). L'outil de terrain : recevoir sa tournée, naviguer, prouver les livraisons et toucher ses gains. Optimisée pour le pouce, l'extérieur et les gants."
+          - text: apps/mobile-driver · iOS + Android · 360 × 760 dp
+      - generic [ref=e20]:
+        - heading "1 Liste des courses du jour" [level=2] [ref=e21]:
+          - generic [ref=e22]: "1"
+          - text: Liste des courses du jour
+        - generic [ref=e23]: L'écran d'atterrissage après le login.
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - generic [ref=e27]: Variation A — Chronologique
+            - generic [ref=e28]: liste
+          - generic [ref=e29]: Tournée en cartes verticales, ‘Maintenant / Ensuite’. Familier, sûr.
+          - generic [ref=e31]:
+            - generic [ref=e32]:
+              - generic [ref=e33]: 9:41
+              - generic [ref=e34]: •
+              - generic [ref=e35]: •••• 5G · 84%
+            - generic [ref=e36]:
+              - generic [ref=e37]:
+                - generic [ref=e38]:
+                  - generic [ref=e39]: Bonjour Karim
+                  - text: Mar. 23 mai · Service de 08:00 à 17:00
+                - generic [ref=e40]: EN LIGNE
+              - generic [ref=e41]:
+                - generic [ref=e42]:
+                  - text: À LIVRER
+                  - generic [ref=e43]: "8"
+                - generic [ref=e44]:
+                  - text: FAITES
+                  - generic [ref=e45]: "3"
+                - generic [ref=e46]:
+                  - text: KM
+                  - generic [ref=e47]: "27"
+              - generic [ref=e48]: MAINTENANT — 11:24
+              - generic [ref=e49]:
+                - generic [ref=e50]: "04"
+                - generic [ref=e51]:
+                  - generic [ref=e52]: Mme Lefèvre
+                  - text: 14 rue Daguerre, 75014
+                - generic [ref=e54]: URGENT
+              - generic [ref=e55]: ENSUITE
+              - generic [ref=e56]:
+                - generic [ref=e57]: "05"
+                - generic [ref=e58]:
+                  - generic [ref=e59]: Bistrot du Coin
+                  - text: 22 av. Parmentier · 12h–14h
+                - generic [ref=e60]: 11:50
+              - generic [ref=e61]:
+                - generic [ref=e62]: "06"
+                - generic [ref=e63]:
+                  - generic [ref=e64]: J. Mercier
+                  - text: 9 rue Oberkampf
+                - generic [ref=e65]: 12:15
+              - generic [ref=e66]:
+                - generic [ref=e67]: "07"
+                - generic [ref=e68]:
+                  - generic [ref=e69]: Pharma Centre
+                  - text: St-Antoine · fragile
+                - generic [ref=e70]: 12:40
+              - button "▶ Démarrer ma tournée" [ref=e72]
+              - generic [ref=e73]:
+                - generic [ref=e74]:
+                  - generic [ref=e75]: 📋
+                  - generic [ref=e76]: Courses
+                - generic [ref=e77]:
+                  - generic [ref=e78]: 🗺
+                  - generic [ref=e79]: Carte
+                - generic [ref=e80]:
+                  - generic [ref=e81]: 💶
+                  - generic [ref=e82]: Gains
+                - generic [ref=e83]:
+                  - generic [ref=e84]: 💬
+                  - generic [ref=e85]: Messages
+                - generic [ref=e86]:
+                  - generic [ref=e87]: 👤
+                  - generic [ref=e88]: Moi
+              - generic:
+                - img
+                - generic:
+                  - text: on/off
+                  - text: en 1 tap
+              - generic:
+                - generic:
+                  - text: course en cours
+                  - text: toujours en tête
+                - img
+        - generic [ref=e89]:
+          - generic [ref=e90]:
+            - generic [ref=e91]: Variation B — Carte d'abord
+            - generic [ref=e92]: map-first
+          - generic [ref=e93]: La carte domine, bottom-sheet sur le stop courant. Plus orienté terrain.
+          - generic [ref=e95]:
+            - generic [ref=e96]:
+              - generic [ref=e97]: 9:41
+              - generic [ref=e98]: •
+              - generic [ref=e99]: •••• 5G · 84%
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - generic [ref=e102]: Ma tournée du jour
+                - generic [ref=e103]: 11/14
+              - generic [ref=e104]:
+                - img [ref=e105]
+                - generic [ref=e118]: ● Hub
+                - generic [ref=e119]: 🚐 Moi
+                - generic [ref=e120]: "📦 #04"
+                - generic [ref=e121]: "📦 #05"
+                - generic [ref=e122]: "📦 #06"
+              - generic [ref=e124]:
+                - generic [ref=e125]:
+                  - text: PROCHAINE LIVRAISON
+                  - generic [ref=e126]: "📦 #04 — Mme Lefèvre"
+                  - text: 1.2 km · 6 min · 14 rue Daguerre
+                - button "Go" [ref=e127]
+              - generic [ref=e128]:
+                - generic [ref=e129]: "05"
+                - generic [ref=e130]:
+                  - generic [ref=e131]: Bistrot du Coin
+                  - text: 14h max · 22 av. Parmentier
+                - generic [ref=e132]: 11:50
+              - generic [ref=e133]:
+                - generic [ref=e134]: "06"
+                - generic [ref=e135]:
+                  - generic [ref=e136]: J. Mercier
+                  - text: Étage 4 · code 8521B
+                - generic [ref=e137]: 12:15
+              - generic [ref=e138]:
+                - generic [ref=e139]:
+                  - generic [ref=e140]: 📋
+                  - generic [ref=e141]: Courses
+                - generic [ref=e142]:
+                  - generic [ref=e143]: 🗺
+                  - generic [ref=e144]: Carte
+                - generic [ref=e145]:
+                  - generic [ref=e146]: 💶
+                  - generic [ref=e147]: Gains
+                - generic [ref=e148]:
+                  - generic [ref=e149]: 💬
+                  - generic [ref=e150]: Messages
+                - generic [ref=e151]:
+                  - generic [ref=e152]: 👤
+                  - generic [ref=e153]: Moi
+              - generic:
+                - img
+                - generic:
+                  - text: itinéraire
+                  - text: optimisé auto
+      - generic [ref=e154]:
+        - heading "2 Détail de course + navigation" [level=2] [ref=e155]:
+          - generic [ref=e156]: "2"
+          - text: Détail de course + navigation
+        - generic [ref=e157]: Tout ce qu'il faut pour livrer un colis.
+      - generic [ref=e158]:
+        - generic [ref=e159]:
+          - generic [ref=e160]:
+            - generic [ref=e161]: A — Action-first
+            - generic [ref=e162]: détail
+          - generic [ref=e163]: Infos en haut, gros bouton ‘Naviguer’ + ‘Livré’. Idéal en intérieur.
+          - generic [ref=e165]:
+            - generic [ref=e166]:
+              - generic [ref=e167]: 9:41
+              - generic [ref=e168]: •
+              - generic [ref=e169]: •••• 5G · 84%
+            - generic [ref=e170]:
+              - generic [ref=e171]:
+                - generic [ref=e172]: ←
+                - generic [ref=e173]: "Course #04"
+                - generic [ref=e174]: URGENT
+              - generic [ref=e175]:
+                - img [ref=e176]
+                - generic [ref=e189]: 🚐 Moi
+                - generic [ref=e190]: 📍 Mme Lefèvre
+              - generic [ref=e191]:
+                - generic [ref=e192]:
+                  - generic [ref=e193]:
+                    - text: CLIENT
+                    - generic [ref=e194]: Mme Lefèvre · 06 12 ••• ••
+                  - generic [ref=e195]:
+                    - button "📞" [ref=e196]
+                    - button "💬" [ref=e197]
+                - separator [ref=e198]
+                - text: ADRESSE
+                - generic [ref=e199]: 14 rue Daguerre, 75014 Paris
+                - text: "Code: 4587B · Étage 3 · Bât. C"
+              - generic [ref=e200]:
+                - text: COLIS
+                - generic [ref=e201]:
+                  - generic [ref=e202]:
+                    - generic [ref=e203]: 1 colis · 3.2 kg
+                    - text: "#TVX-2410-0042 · fragile"
+                  - generic [ref=e204]: 📷 photo
+              - generic [ref=e205]:
+                - button "🚫 Incident" [ref=e206]
+                - button "🧭 Naviguer · 6 min" [ref=e207]
+              - button "✓ Marquer livré" [ref=e208]
+              - generic:
+                - generic:
+                  - text: 2 actions toujours
+                  - text: à portée de pouce
+                - img
+        - generic [ref=e209]:
+          - generic [ref=e210]:
+            - generic [ref=e211]: B — Navigation plein écran
+            - generic [ref=e212]: immersif
+          - generic [ref=e213]: Map en plein écran, instructions tour-par-tour. Idéal en conduite.
+          - generic [ref=e215]:
+            - generic [ref=e216]:
+              - generic [ref=e217]: 9:41
+              - generic [ref=e218]: •
+              - generic [ref=e219]: •••• 5G · 84%
+            - generic [ref=e220]:
+              - generic [ref=e221]:
+                - img [ref=e222]
+                - generic [ref=e235]: 🚐 Vous
+                - generic [ref=e236]: 📍 Arrivée
+              - generic [ref=e237]:
+                - generic [ref=e238]: ←
+                - generic [ref=e240]:
+                  - generic [ref=e241]: 14 rue Daguerre
+                  - generic [ref=e242]: 6 min · 1.2 km
+              - generic [ref=e243]:
+                - generic [ref=e244]:
+                  - generic [ref=e245]:
+                    - text: PROCHAINE ÉTAPE
+                    - generic [ref=e246]: ↰ Tourner à gauche
+                    - text: dans 180 m — rue Boulard
+                  - button "Arrivé ?" [ref=e247]
+                - separator [ref=e248]
+                - generic [ref=e249]:
+                  - generic [ref=e250]: Mme Lefèvre · code 4587B
+                  - generic [ref=e251]:
+                    - generic [ref=e252]: 📞
+                    - generic [ref=e253]: 💬
+              - generic:
+                - img
+                - generic:
+                  - text: nav intégrée,
+                  - text: pas d'app externe
+      - generic [ref=e254]:
+        - heading "3 Preuve de livraison (POD)" [level=2] [ref=e255]:
+          - generic [ref=e256]: "3"
+          - text: Preuve de livraison (POD)
+        - generic [ref=e257]: Photo, scan, signature, remarques.
+      - generic [ref=e258]:
+        - generic [ref=e259]:
+          - generic [ref=e260]:
+            - generic [ref=e261]: A — Stepper
+            - generic [ref=e262]: guidé
+          - generic [ref=e263]: Étapes obligatoires séparées (Scan → Photo → Signer). Réduit les oublis.
+          - generic [ref=e265]:
+            - generic [ref=e266]:
+              - generic [ref=e267]: 9:41
+              - generic [ref=e268]: •
+              - generic [ref=e269]: •••• 5G · 84%
+            - generic [ref=e270]:
+              - generic [ref=e271]:
+                - generic [ref=e272]: ←
+                - generic [ref=e273]: Preuve de livraison
+              - generic [ref=e274]:
+                - generic [ref=e275]: "1"
+                - generic [ref=e276]: Scan
+                - generic [ref=e278]: "2"
+                - generic [ref=e279]: Photo
+                - generic [ref=e281]: "3"
+                - generic [ref=e282]: Signer
+              - generic [ref=e283]:
+                - generic [ref=e285]: caméra · scan code-barres
+                - generic [ref=e286]:
+                  - generic [ref=e287]:
+                    - generic [ref=e288]: DERNIER SCAN
+                    - generic [ref=e289]: ✓
+                  - generic [ref=e290]: "#TVX-2410-0042"
+                  - text: Mme Lefèvre · 3.2 kg · fragile
+              - generic [ref=e291]:
+                - text: DESTINATAIRE
+                - generic [ref=e292]:
+                  - generic [ref=e293]: ✓ Client
+                  - generic [ref=e294]: Tiers
+                  - generic [ref=e295]: Boîte aux lettres
+                  - generic [ref=e296]: Concierge
+              - generic [ref=e297]:
+                - button "Plus tard" [ref=e298]
+                - button "Étape suivante →" [ref=e299]
+              - generic:
+                - generic:
+                  - text: stepper clair,
+                  - text: pas d'ambigüité
+                - img
+        - generic [ref=e300]:
+          - generic [ref=e301]:
+            - generic [ref=e302]: B — Tout-en-un
+            - generic [ref=e303]: rapide
+          - generic [ref=e304]: Photo + scan + signature sur un seul écran. Pour livreurs expérimentés.
+          - generic [ref=e306]:
+            - generic [ref=e307]:
+              - generic [ref=e308]: 9:41
+              - generic [ref=e309]: •
+              - generic [ref=e310]: •••• 5G · 84%
+            - generic [ref=e311]:
+              - generic [ref=e312]:
+                - generic [ref=e313]: ←
+                - generic [ref=e314]: Valider la livraison
+              - generic [ref=e315]: "Course #04 · Mme Lefèvre"
+              - generic [ref=e316]:
+                - generic [ref=e317]:
+                  - generic [ref=e319]: 📸 photo
+                  - generic [ref=e320]:
+                    - generic [ref=e321]: Photo colis
+                    - generic [ref=e322]: ✓
+                - generic [ref=e323]:
+                  - generic [ref=e325]: 🔳 scan
+                  - generic [ref=e326]:
+                    - generic [ref=e327]: Code-barres
+                    - generic [ref=e328]: ✓
+              - generic [ref=e329]:
+                - text: SIGNATURE
+                - generic [ref=e330]:
+                  - img [ref=e331]
+                  - generic [ref=e333]: Signature client
+                - generic [ref=e334]:
+                  - generic [ref=e335]: Karim · auj. 11:42
+                  - button "Effacer" [ref=e336]
+              - generic [ref=e337]:
+                - text: REMARQUES (optionnel)
+                - generic [ref=e338]: Laissé à la voisine (porte 4B)
+              - button "✓ Confirmer la livraison" [ref=e339]
+              - generic [ref=e340]:
+                - generic [ref=e341]:
+                  - generic [ref=e342]: 📋
+                  - generic [ref=e343]: Courses
+                - generic [ref=e344]:
+                  - generic [ref=e345]: 🗺
+                  - generic [ref=e346]: Carte
+                - generic [ref=e347]:
+                  - generic [ref=e348]: 💶
+                  - generic [ref=e349]: Gains
+                - generic [ref=e350]:
+                  - generic [ref=e351]: 💬
+                  - generic [ref=e352]: Messages
+                - generic [ref=e353]:
+                  - generic [ref=e354]: 👤
+                  - generic [ref=e355]: Moi
+              - generic: POD v2
+      - generic [ref=e356]:
+        - heading "4 Historique & gains" [level=2] [ref=e357]:
+          - generic [ref=e358]: "4"
+          - text: Historique & gains
+        - generic [ref=e359]: Combien j'ai gagné, et quelles courses.
+      - generic [ref=e360]:
+        - generic [ref=e361]:
+          - generic [ref=e362]:
+            - generic [ref=e363]: A — Synthèse + barre
+            - generic [ref=e364]: résumé
+          - generic [ref=e365]: Gros chiffre du mois, semaine en barres, derniers items.
+          - generic [ref=e367]:
+            - generic [ref=e368]:
+              - generic [ref=e369]: 9:41
+              - generic [ref=e370]: •
+              - generic [ref=e371]: •••• 5G · 84%
+            - generic [ref=e372]:
+              - generic [ref=e373]:
+                - generic [ref=e374]: Historique & gains
+                - generic [ref=e375]: Mai
+              - generic [ref=e376]:
+                - text: GAINS DU MOIS
+                - generic [ref=e377]: 2 348 €
+                - generic [ref=e378]:
+                  - generic [ref=e379]: 184 courses
+                  - generic [ref=e380]: +12% vs avr.
+              - generic [ref=e381]: SEMAINE
+              - generic [ref=e382]:
+                - generic [ref=e385]: L
+                - generic [ref=e388]: M
+                - generic [ref=e391]: M
+                - generic [ref=e394]: J
+                - generic [ref=e397]: V
+                - generic [ref=e400]: S
+                - generic [ref=e403]: D
+              - generic [ref=e404]: DERNIÈRES COURSES
+              - generic [ref=e405]:
+                - generic [ref=e406]: ✓
+                - generic [ref=e407]:
+                  - generic [ref=e408]: J. Bocuse — 7e
+                  - text: auj. 10:42 · 14 €
+                - generic [ref=e410]: livré
+              - generic [ref=e411]:
+                - generic [ref=e412]: ✓
+                - generic [ref=e413]:
+                  - generic [ref=e414]: Maison Pradier
+                  - text: auj. 09:58 · 9 €
+                - generic [ref=e416]: livré
+              - generic [ref=e417]:
+                - generic [ref=e418]: "!"
+                - generic [ref=e419]:
+                  - generic [ref=e420]: A. Durand
+                  - text: hier · incident — 3 €
+                - generic [ref=e422]: retour
+              - generic [ref=e423]:
+                - generic [ref=e424]:
+                  - generic [ref=e425]: 📋
+                  - generic [ref=e426]: Courses
+                - generic [ref=e427]:
+                  - generic [ref=e428]: 🗺
+                  - generic [ref=e429]: Carte
+                - generic [ref=e430]:
+                  - generic [ref=e431]: 💶
+                  - generic [ref=e432]: Gains
+                - generic [ref=e433]:
+                  - generic [ref=e434]: 💬
+                  - generic [ref=e435]: Messages
+                - generic [ref=e436]:
+                  - generic [ref=e437]: 👤
+                  - generic [ref=e438]: Moi
+        - generic [ref=e439]:
+          - generic [ref=e440]:
+            - generic [ref=e441]: B — Timeline
+            - generic [ref=e442]: détaillé
+          - generic [ref=e443]: Par jour, chronologique, plus proche d'un journal de bord.
+          - generic [ref=e445]:
+            - generic [ref=e446]:
+              - generic [ref=e447]: 9:41
+              - generic [ref=e448]: •
+              - generic [ref=e449]: •••• 5G · 84%
+            - generic [ref=e450]:
+              - generic [ref=e451]:
+                - generic [ref=e452]: Mes courses
+                - generic [ref=e453]:
+                  - generic [ref=e454]: Sem.
+                  - generic [ref=e455]: Mois
+                  - generic [ref=e456]: Tout
+              - generic [ref=e457]:
+                - generic [ref=e458]:
+                  - text: COURSES
+                  - generic [ref=e459]: "184"
+                  - generic [ref=e460]: +12%
+                - generic [ref=e461]:
+                  - text: € NETS
+                  - generic [ref=e462]: 2 348
+                  - generic [ref=e463]: moy. 12,7€/c.
+              - generic [ref=e464]: VEN. 17 MAI
+              - generic [ref=e465]:
+                - generic [ref=e466]:
+                  - generic [ref=e467]: "08"
+                  - generic [ref=e468]:
+                    - generic [ref=e469]: Pharma Bastille
+                    - text: 11:42 · 4.1 km · 12,50 €
+                  - generic [ref=e470]: ✓
+                - generic [ref=e471]:
+                  - generic [ref=e472]: "07"
+                  - generic [ref=e473]:
+                    - generic [ref=e474]: Le Petit Marché
+                    - text: 10:58 · 2.3 km · 9,00 €
+                  - generic [ref=e475]: ✓
+                - generic [ref=e476]:
+                  - generic [ref=e477]: "06"
+                  - generic [ref=e478]:
+                    - generic [ref=e479]: A. Durand
+                    - text: 09:30 · refus client — retour
+                  - generic [ref=e481]: "!"
+              - generic [ref=e482]: JEU. 16 MAI
+              - generic [ref=e483]:
+                - generic [ref=e484]:
+                  - generic [ref=e485]: "11"
+                  - generic [ref=e486]:
+                    - generic [ref=e487]: Hub Nation
+                    - text: 17:02 · clôture journée
+                  - generic [ref=e488]: —
+                - generic [ref=e489]:
+                  - generic [ref=e490]: "10"
+                  - generic [ref=e491]:
+                    - generic [ref=e492]: J. Mercier
+                    - text: 16:14 · 3.0 km · 11,00 €
+                  - generic [ref=e493]: ✓
+              - generic [ref=e494]:
+                - generic [ref=e495]:
+                  - generic [ref=e496]: 📋
+                  - generic [ref=e497]: Courses
+                - generic [ref=e498]:
+                  - generic [ref=e499]: 🗺
+                  - generic [ref=e500]: Carte
+                - generic [ref=e501]:
+                  - generic [ref=e502]: 💶
+                  - generic [ref=e503]: Gains
+                - generic [ref=e504]:
+                  - generic [ref=e505]: 💬
+                  - generic [ref=e506]: Messages
+                - generic [ref=e507]:
+                  - generic [ref=e508]: 👤
+                  - generic [ref=e509]: Moi
+              - generic:
+                - generic:
+                  - text: vue
+                  - text: chronologique
+                - img
+      - generic [ref=e510]:
+        - heading "5 Notifications & messages dispatcher" [level=2] [ref=e511]:
+          - generic [ref=e512]: "5"
+          - text: Notifications & messages dispatcher
+        - generic [ref=e513]: Garder le lien avec le hub, sans surcharger.
+      - generic [ref=e514]:
+        - generic [ref=e515]:
+          - generic [ref=e516]:
+            - generic [ref=e517]: A — Inbox unifiée
+            - generic [ref=e518]: liste
+          - generic [ref=e519]: Système + dispatch + opérations dans une seule boîte, filtrée par onglets.
+          - generic [ref=e521]:
+            - generic [ref=e522]:
+              - generic [ref=e523]: 9:41
+              - generic [ref=e524]: •
+              - generic [ref=e525]: •••• 5G · 84%
+            - generic [ref=e526]:
+              - generic [ref=e527]:
+                - generic [ref=e528]: Boîte de réception
+                - generic [ref=e529]: 3 nouv.
+              - generic [ref=e530]:
+                - generic [ref=e531]: Tout
+                - generic [ref=e532]: Dispatcher
+                - generic [ref=e533]: Système
+              - generic [ref=e534]:
+                - generic [ref=e535]: "!"
+                - generic [ref=e536]:
+                  - generic [ref=e537]: Mission ré-attribuée
+                  - text: "dispatch · il y a 2 min · #07 → vous"
+                - generic [ref=e539]: "!"
+              - generic [ref=e540]:
+                - generic [ref=e541]: L
+                - generic [ref=e542]:
+                  - generic [ref=e543]: Léa (Dispatch)
+                  - text: “Tu peux passer chez Pharma…”
+                - generic [ref=e544]: 3m
+              - generic [ref=e545]:
+                - generic [ref=e546]: i
+                - generic [ref=e547]:
+                  - generic [ref=e548]: Bonus week-end activé
+                  - text: système · +0,80 € / course
+                - generic [ref=e549]: 1h
+              - generic [ref=e550]:
+                - generic [ref=e551]: L
+                - generic [ref=e552]:
+                  - generic [ref=e553]: Léa (Dispatch)
+                  - text: “Pause de 30 min validée”
+                - generic [ref=e554]: hier
+              - generic [ref=e555]:
+                - generic [ref=e556]: ✓
+                - generic [ref=e557]:
+                  - generic [ref=e558]: "POD #03 validé"
+                  - text: système · paiement traité
+                - generic [ref=e559]: hier
+              - generic [ref=e560]:
+                - generic [ref=e561]: i
+                - generic [ref=e562]:
+                  - generic [ref=e563]: Mise à jour app v2.4
+                  - text: système · nouveautés POD
+                - generic [ref=e564]: lun.
+              - button "✎ Nouveau message au dispatch" [ref=e565]
+              - generic [ref=e566]:
+                - generic [ref=e567]:
+                  - generic [ref=e568]: 📋
+                  - generic [ref=e569]: Courses
+                - generic [ref=e570]:
+                  - generic [ref=e571]: 🗺
+                  - generic [ref=e572]: Carte
+                - generic [ref=e573]:
+                  - generic [ref=e574]: 💶
+                  - generic [ref=e575]: Gains
+                - generic [ref=e576]:
+                  - generic [ref=e577]: 💬
+                  - generic [ref=e578]: Messages
+                - generic [ref=e579]:
+                  - generic [ref=e580]: 👤
+                  - generic [ref=e581]: Moi
+        - generic [ref=e582]:
+          - generic [ref=e583]:
+            - generic [ref=e584]: B — Chat 1:1
+            - generic [ref=e585]: conversation
+          - generic [ref=e586]: Conversation directe avec son dispatcher. Pièces jointes, statuts de lecture.
+          - generic [ref=e588]:
+            - generic [ref=e589]:
+              - generic [ref=e590]: 9:41
+              - generic [ref=e591]: •
+              - generic [ref=e592]: •••• 5G · 84%
+            - generic [ref=e593]:
+              - generic [ref=e594]:
+                - generic [ref=e595]: ←
+                - generic [ref=e596]: L
+                - generic [ref=e597]:
+                  - generic [ref=e598]: Léa · Dispatch
+                  - text: en ligne · répond en ~2 min
+              - generic [ref=e599]: — auj. 11:18 —
+              - generic [ref=e600]: "Salut Karim ! Tu peux prendre la livraison #07 ? Le client a appelé."
+              - generic [ref=e601]: "Ok, je termine la #04 et j'y vais 👍"
+              - generic [ref=e602]: Top, je te l'ajoute. Délai max 12h45.
+              - generic [ref=e604]:
+                - generic [ref=e605]: 📎
+                - generic [ref=e606]: Tape ton message…
+                - generic [ref=e607]: ⏎
+              - generic [ref=e608]:
+                - generic [ref=e609]:
+                  - generic [ref=e610]: 📋
+                  - generic [ref=e611]: Courses
+                - generic [ref=e612]:
+                  - generic [ref=e613]: 🗺
+                  - generic [ref=e614]: Carte
+                - generic [ref=e615]:
+                  - generic [ref=e616]: 💶
+                  - generic [ref=e617]: Gains
+                - generic [ref=e618]:
+                  - generic [ref=e619]: 💬
+                  - generic [ref=e620]: Messages
+                - generic [ref=e621]:
+                  - generic [ref=e622]: 👤
+                  - generic [ref=e623]: Moi
+              - generic:
+                - img
+                - generic:
+                  - text: chat 1:1
+                  - text: + pièces jointes
+  - contentinfo [ref=e624]:
+    - generic [ref=e625]: ✶ ✶ ✶
+    - generic [ref=e626]: basse fidélité · pour explorer la structure et les flux · 4 applications · 17 écrans clés · 34 variations
